@@ -75,14 +75,34 @@ func TestEndToEnd(t *testing.T) {
 	if len(chapters) != 3 {
 		t.Fatalf("expected 3 chapters, found %d", len(chapters))
 	}
-	if chapters[0].Tags.Title != "Intro" || chapters[0].Start != 0 {
+
+	// ffprobe reports start/end as raw values in the container's time_base units
+	// (e.g. 1/1000 for MP4 -> raw == ms, but other time_bases, e.g. on Windows,
+	// differ). Convert to milliseconds via time_base so these assertions are
+	// platform-independent. This mirrors the production verification in compareChapters.
+	start := func(i int) int64 {
+		ms, ok := timebaseToMillis(chapters[i].Start, chapters[i].TimeBase)
+		if !ok {
+			t.Fatalf("could not convert time_base %q for chapter %d", chapters[i].TimeBase, i)
+		}
+		return ms
+	}
+	end := func(i int) int64 {
+		ms, ok := timebaseToMillis(chapters[i].End, chapters[i].TimeBase)
+		if !ok {
+			t.Fatalf("could not convert time_base %q for chapter %d", chapters[i].TimeBase, i)
+		}
+		return ms
+	}
+
+	if chapters[0].Tags.Title != "Intro" || start(0) != 0 {
 		t.Errorf("chapter 0 mismatch: %+v", chapters[0])
 	}
-	if chapters[1].Start != 5500 {
-		t.Errorf("chapter 1 start %d, want 5500 (ms precision)", chapters[1].Start)
+	if got := start(1); got != 5500 {
+		t.Errorf("chapter 1 start %d, want 5500 (ms precision)", got)
 	}
-	if chapters[2].Start != 10000 || chapters[2].End != 20000 {
-		t.Errorf("chapter 2 start/end mismatch: %+v (want start 10000, end 20000)", chapters[2])
+	if gotStart, gotEnd := start(2), end(2); gotStart != 10000 || gotEnd != 20000 {
+		t.Errorf("chapter 2 start/end mismatch: start=%d end=%d (want start 10000, end 20000)", gotStart, gotEnd)
 	}
 }
 
