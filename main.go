@@ -1,0 +1,241 @@
+package main
+
+import (
+	"fmt"
+	"io"
+	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+)
+
+func main() {
+	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
+}
+
+// run executes the CLI and returns a process exit code (0 for success).
+func run(args []string, stdout, stderr io.Writer) int {
+	pa, err := parseArgs(args, stdout, stderr)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	// Short-circuit modes.
+	if pa.help || pa.version {
+		return 0
+	}
+	if pa.example {
+		if werr := writeExampleFile(); werr != nil {
+			fmt.Fprintf(stderr, "Error: %v\n", werr)
+			return 1
+		}
+		return 0
+	}
+	if pa.check {
+		return runCheck(stdout, stderr)
+	}
+
+	return runEmbed(pa, stdout, stderr)
+}
+
+func runCheck(stdout, stderr io.Writer) int {
+	fmt.Fprintln(stdout, "Checking dependencies...")
+	fmt.Fprintln(stdout)
+	di := checkDependencies()
+	for _, l := range di.listReports() {
+		fmt.Fprintln(stdout, l)
+	}
+	if di.ready() {
+		fmt.Fprintln(stdout, "\nSystem is ready.")
+		return 0
+	}
+	fmt.Fprintln(stdout)
+	fmt.Fprint(stderr, installHint(di))
+	return 1
+}
+
+func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
+	// 1. Dependency check (fail fast, no modifications yet).
+	di := checkDependencies()
+	if !di.ready() {
+		fmt.Fprint(stderr, installHint(di))
+		return 1
+	}
+	fmt.Fprintln(stdout, "✓ Dependencies found")
+
+	// 2. Parse chapters.
+	chapters, err := ParseChaptersFile(pa.chapters)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	// 3. Structural validation.
+	if err := ValidateChapters(chapters); err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "✓ Chapters validated")
+
+	// 4. Input video existence.
+	if _, err := os.Stat(pa.video); err != nil {
+		fmt.Fprintf(stderr, "Error: video file not found: %q\n", pa.video)
+		return 1
+	}
+	if fi, err := os.Stat(pa.video); err == nil && fi.IsDir() {
+		fmt.Fprintf(stderr, "Error: %q is a directory, not a video file\n", pa.video)
+		return 1
+	}
+
+	// 5. Determine output path.
+	output := pa.output
+	if output == "" {
+		output = defaultOutputPath(pa.video)
+	}
+
+	// Guard against overwriting the video input itself.
+	if samePath(output, pa.video) {
+		fmt.Fprintf(stderr, "Error: output path %q would overwrite the input video; choose a different --output\n", output)
+		return 1
+	}
+	// Guard against overwriting the user's chapter file (another input).
+	if samePath(output, pa.chapters) {
+		fmt.Fprintf(stderr, "Error: output path %q would overwrite the chapter file; choose a different --output\n", output)
+		return 1
+	}
+
+	// 6. Refuse to overwrite existing output unless --overwrite.
+	if _, err := os.Stat(output); err == nil && !pa.overwrite {
+		fmt.Fprintf(stderr,
+			"Error: output file already exists: %q\nUse --overwrite to replace it.\n", output)
+		return 1
+	}
+
+	// 7. Get video duration.
+	durationMs, err := getVideoDurationMs(pa.video)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	// 8. Validate chapters against duration.
+	if err := ValidateAgainstDuration(chapters, durationMs); err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+	fmt.Fprintln(stdout, "✓ Video duration checked")
+
+	// 9. Generate metadata and remux.
+	meta := buildMetadata(chapters, durationMs)
+	metaPath, err := writeTempMetadata(meta)
+	if err != nil {
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	outputExt := outputExtension(output)
+
+	// 9b. Run the remux with signal handling. The signal channel is registered
+	// BEFORE the child FFmpeg process is started. This is required: if a
+	// SIGINT/SIGTERM arrived in the window after the child starts but before
+	// signal.Notify is registered, Go's default handler would terminate addch
+	// immediately without reaping the child, leaving an orphaned FFmpeg running.
+	// With the channel live up front, any such signal is routed to our handler,
+	// which kills the child, waits for it to fully exit (reaping it exactly
+	// once), then removes the partial output and temp metadata — never leaving
+	// an orphan process or racing the writer.
+	fmt.Fprintln(stdout, "→ Embedding chapters...")
+
+	interrupted := make(chan os.Signal, 1)
+	signal.Notify(interrupted, os.Interrupt, syscall.SIGTERM)
+
+	rp, err := startFFmpegRemux(pa.video, metaPath, output, outputExt, pa.overwrite)
+	if err != nil {
+		signal.Stop(interrupted)
+		os.Remove(metaPath)
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	select {
+	case sig := <-interrupted:
+		rp.interrupt() // kill, then wait for the child to actually stop
+		signal.Stop(interrupted)
+		cleanupOutput(output)
+		os.Remove(metaPath)
+		fmt.Fprintln(stderr, "\nInterrupted; no output was written.")
+		// Follow the conventional shell exit codes for a caught signal:
+		// SIGINT -> 130 (128+2), SIGTERM -> 143 (128+15).
+		if sig == syscall.SIGTERM {
+			return 143
+		}
+		return 130
+	case err = <-rp.done():
+		signal.Stop(interrupted)
+	}
+
+	os.Remove(metaPath) // always clean up temp metadata
+	if err != nil {
+		cleanupOutput(output)
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	// 10. Verify.
+	if err := verifyChapters(output, chapters, durationMs); err != nil {
+		cleanupOutput(output)
+		fmt.Fprintf(stderr, "Error: %v\n", err)
+		return 1
+	}
+
+	fmt.Fprintln(stdout, "✓ Chapters embedded successfully")
+	fmt.Fprintln(stdout, "✓ Verification passed")
+	fmt.Fprintf(stdout, "\nOutput:\n%s\n", output)
+	return 0
+}
+
+// cleanupOutput removes a (possibly partial) output file, ignoring errors.
+func cleanupOutput(output string) {
+	if err := os.Remove(output); err != nil && !os.IsNotExist(err) {
+		// Deliberately ignore cleanup errors; the file may belong to another process.
+		_ = err
+	}
+}
+
+// samePath reports whether two paths refer to the same underlying file. It
+// normalizes each path to an absolute, cleaned form and, when both paths exist,
+// resolves symlinks so that a symlinked output pointing at the input is also
+// detected. This guarantees the input video can never be overwritten via the
+// output path, including through identical paths, relative vs absolute forms,
+// normalization differences, or symlinks.
+func samePath(a, b string) bool {
+	resolve := func(p string) (string, bool) {
+		abs, err := filepath.Abs(p)
+		if err != nil {
+			return "", false
+		}
+		abs = filepath.Clean(abs)
+		// Resolve symlinks only when the path exists; for a not-yet-created output
+		// we fall back to the cleaned absolute form.
+		if ev, err := filepath.EvalSymlinks(abs); err == nil {
+			return ev, true
+		}
+		return abs, true
+	}
+	ra, oka := resolve(a)
+	rb, okb := resolve(b)
+	return oka && okb && ra == rb
+}
+
+func writeExampleFile() error {
+	name := "example_chapters.txt"
+	if _, err := os.Stat(name); err == nil {
+		return fmt.Errorf("example file %q already exists in the current directory", name)
+	}
+	if err := os.WriteFile(name, []byte(exampleContent), 0o644); err != nil {
+		return fmt.Errorf("could not write example file %q: %w", name, err)
+	}
+	fmt.Printf("Wrote %s\n", name)
+	return nil
+}

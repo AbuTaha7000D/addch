@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }} / go ${{ matrix.go }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        go: ['1.22', '1.23']
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+
+      - name: Install FFmpeg (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install FFmpeg (macOS)
+        if: runner.os == 'macOS'
+        run: brew install ffmpeg
+
+      - name: Install FFmpeg (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          choco install ffmpeg -y --no-progress
+          # choco may not refresh PATH for the current runner shell. Deterministically
+          # add choco's ffmpeg/ffprobe bin directory to PATH for subsequent steps via
+          # $GITHUB_PATH. All candidates below are covered by the choco `ffmpeg` package.
+          if ! command -v ffmpeg >/dev/null 2>&1; then
+            for d in \
+              "/c/ProgramData/chocolatey/lib/ffmpeg/tools/ffmpeg/bin" \
+              "/c/ProgramData/chocolatey/bin"; do
+              if [ -f "$d/ffmpeg.exe" ]; then
+                echo "$d" >> "$GITHUB_PATH"
+              fi
+            done
+          fi
+
+      # Fail loudly (instead of silently skipping integration tests) if FFmpeg is
+      # not discoverable after install. This prevents Windows CI from "passing"
+      # without ever exercising the real remux pipeline.
+      - name: Verify FFmpeg on PATH
+        shell: bash
+        run: |
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            echo "::error::ffmpeg/ffprobe not found on PATH after install; cannot run integration tests"
+            exit 1
+          fi
+          echo "ffmpeg: $(command -v ffmpeg)"
+          echo "ffprobe: $(command -v ffprobe)"
+          ffmpeg -version | head -n 1
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: gofmt
+        shell: bash
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then
+            echo "::error::gofmt required on these files:"; echo "$out"
+            exit 1
+          fi
+
+      - name: Test
+        run: go test ./...
+
+      - name: Test (race)
+        run: go test -race ./...
