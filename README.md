@@ -31,7 +31,7 @@ Install them if needed:
 ### Prebuilt binaries
 
 Download the release binary for your platform from the
-[Releases page](https://github.com/abutaha/addch/releases). You do **not** need to
+[Releases page](https://github.com/abutaha7000d/addch/releases). You do **not** need to
 install Go to use a prebuilt binary — just download the matching file for your
 system, make it executable (macOS/Linux), and run it.
 
