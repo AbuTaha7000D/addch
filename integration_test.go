@@ -478,3 +478,133 @@ func TestEndToEndSpecialCharacterTitles(t *testing.T) {
 		}
 	}
 }
+
+// makeTestContainer creates a small, real video fixture in the requested
+// container ("mp4" or "mkv") and returns its path. The mp4 is produced by the
+// shared makeTestVideo helper; other containers are transmuxed from it with
+// stream copy, exactly as the existing MKV coverage does.
+func makeTestContainer(t *testing.T, dir, container, durationSec string) string {
+	t.Helper()
+	mp4 := makeTestVideo(t, dir, durationSec)
+	if container == "mp4" {
+		return mp4
+	}
+	out := filepath.Join(dir, "source."+container)
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", mp4, "-c", "copy", out}
+	if o, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
+		t.Fatalf("could not create %s source fixture: %v\n%s", container, err, o)
+	}
+	return out
+}
+
+// endMsOf converts a probeChapter's end to milliseconds using its time_base,
+// mirroring the production verification logic (same as millisecondsOf but for End).
+func endMsOf(t *testing.T, c probeChapter) int64 {
+	t.Helper()
+	ms, ok := timebaseToMillis(c.End, c.TimeBase)
+	if !ok {
+		t.Fatalf("could not convert end time_base %q", c.TimeBase)
+	}
+	return ms
+}
+
+// TestChapterRoundTripMP4AndMKV is the Phase 2A empirical verification that
+// chapter metadata round-trips through real FFmpeg/FFprobe in both the MP4 and
+// Matroska (MKV) containers. It embeds an adversarial chapter set (Arabic and
+// Unicode, spaces, `=`, `;`, `#`, double quotes, non-final literal backslashes,
+// and the literal two-character text sequences `\n`, `\t`, `\r`) and, via
+// ffprobe, asserts the exact chapter count, exact titles, start timestamps
+// converted from each chapter's reported time_base, and the end-chain
+// invariant (each end equals the next chapter's start; the final end equals the
+// source media duration). Copy-out safety is also re-asserted here: the source
+// must remain byte-identical.
+//
+// The test skips only when ffmpeg/ffprobe are unavailable; any remux or
+// verification failure while the tools are installed fails the test.
+func TestChapterRoundTripMP4AndMKV(t *testing.T) {
+	for _, container := range []string{"mp4", "mkv"} {
+		t.Run(container, func(t *testing.T) {
+			requireTools(t)
+
+			dir := t.TempDir()
+			video := makeTestContainer(t, dir, container, "10")
+
+			wantStarts := []int64{0, 2500, 5250, 8000}
+			wantTitles := []string{
+				"مقدمة With Spaces and حروف",
+				`eq=a ;semi #hash "double quoted"`,
+				`Back\slash literal\nsequence`,
+				`literal\tsequence literal\rreturn mixed العربية mixed`,
+			}
+
+			chaptersFile := filepath.Join(dir, "chapters.txt")
+			content := "00:00:00.000 مقدمة With Spaces and حروف\n" +
+				"00:00:02.500 eq=a ;semi #hash \"double quoted\"\n" +
+				"00:00:05.250 Back\\slash literal\\nsequence\n" +
+				"00:00:08.000 literal\\tsequence literal\\rreturn mixed العربية mixed\n"
+			if err := os.WriteFile(chaptersFile, []byte(content), 0o644); err != nil {
+				t.Fatalf("write chapters: %v", err)
+			}
+
+			srcBefore, err := os.ReadFile(video)
+			if err != nil {
+				t.Fatalf("read source before embed: %v", err)
+			}
+
+			_, errStr, code := runEmbedForTest(chaptersFile, video, "", false)
+			if code != 0 {
+				t.Fatalf("[%s] embed failed with code %d:\n%s", container, code, errStr)
+			}
+
+			// Copy-out safety: the source media must be untouched.
+			if srcAfter, err := os.ReadFile(video); err != nil {
+				t.Fatalf("read source after embed: %v", err)
+			} else if !bytes.Equal(srcBefore, srcAfter) {
+				t.Errorf("[%s] source video was modified", container)
+			}
+
+			durationMs, err := getVideoDurationMs(video)
+			if err != nil {
+				t.Fatalf("[%s] could not read source duration: %v", container, err)
+			}
+
+			out := defaultOutputPath(video)
+			chapters := probeChaptersRaw(t, out)
+
+			if len(chapters) != len(wantTitles) {
+				t.Fatalf("[%s] chapter count = %d, want %d", container, len(chapters), len(wantTitles))
+			}
+			t.Logf("[%s] chapter time_base = %q; source duration = %d ms",
+				container, chapters[0].TimeBase, durationMs)
+
+			for i, wantStart := range wantStarts {
+				if got := millisecondsOf(t, chapters[i]); got != wantStart {
+					t.Errorf("[%s] chapter %d start = %d ms, want %d ms", container, i, got, wantStart)
+				}
+				if chapters[i].Tags.Title != wantTitles[i] {
+					t.Errorf("[%s] chapter %d title = %q, want %q", container, i, chapters[i].Tags.Title, wantTitles[i])
+				}
+			}
+
+			// End-chain invariant: each chapter ends where the next one starts,
+			// converted through the same time-base logic as the production verifier.
+			for i := 0; i < len(chapters)-1; i++ {
+				got := endMsOf(t, chapters[i])
+				want := millisecondsOf(t, chapters[i+1])
+				if got != want {
+					t.Errorf("[%s] chapter %d end = %d ms, want next chapter start %d ms",
+						container, i, got, want)
+				}
+			}
+
+			// Final chapter end equals the target media (source) duration. A
+			// 1 ms tolerance mirrors the production verifier's toleranceMs and
+			// absorbs container-level rounding of the duration probe.
+			finalEnd := endMsOf(t, chapters[len(chapters)-1])
+			if diff(finalEnd, durationMs) > toleranceMs {
+				t.Errorf("[%s] final chapter end = %d ms, want source duration %d ms (within %d ms)",
+					container, finalEnd, durationMs, toleranceMs)
+			}
+		})
+	}
+}
