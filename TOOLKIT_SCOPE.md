@@ -83,9 +83,16 @@ toolkit must:
 
 ## Container support
 
-The exact supported media-container matrix is deliberately **deferred to
-Phase 2 empirical FFmpeg verification**. Until that verification is complete,
-documentation must **not** claim support for any untested video or audio format.
+`addch` chapter embedding is **empirically verified only** for the **MP4**,
+**MKV**, and **M4A/AAC** containers (Phase 2 FFmpeg verification; see
+`FFMPEG_VERIFICATION.md`).
+
+Each additional container requires its **own** real FFmpeg/FFprobe integration
+test before it may be added to the support matrix.
+
+This matrix applies **only to `addch`**. It does not yet claim `rmch` or `getch`
+compatibility with any container, because those commands are not implemented or
+verified.
 
 ---
 

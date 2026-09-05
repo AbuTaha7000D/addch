@@ -1,15 +1,18 @@
 # FFmpeg Chapter Round-Trip Verification
 
-Empirical evidence recorded after running the committed Phase 2A integration
-test `TestChapterRoundTripMP4AndMKV` (commit `992a226`) against real FFmpeg /
-FFprobe. This document records only what that test verified.
+Empirical evidence from the committed integration tests, run against real
+FFmpeg / FFprobe. This document records only what those tests verified.
 
 ## Scope of evidence
 
-The sole source is the test `TestChapterRoundTripMP4AndMKV` in
-`integration_test.go`. It embeds a small real fixture in the MP4 and Matroska
-(MKV) containers, builds the accompanying MKV fixture by transmuxing
-(stream copy), then asserts the round-trip via FFprobe.
+Both tests live in `integration_test.go`:
+
+- `TestChapterRoundTripMP4AndMKV` (commit `992a226`): embeds a small real
+  fixture in the MP4 and Matroska (MKV) containers, builds the accompanying MKV
+  fixture by transmuxing (stream copy), and asserts the round-trip via FFprobe.
+- `TestChapterRoundTripM4A` (commit `1c1985a`): embeds a small real M4A/AAC
+  audio fixture (no video), synthesized deterministically from a lavfi sine
+  input, and asserts the round-trip via FFprobe.
 
 ## How to reproduce
 
@@ -40,6 +43,9 @@ Each title was returned by FFprobe with exact string equality for the tested
 valid UTF-8 titles, including the literal escape-lookalike sequences and the
 Unicode text.
 
+The literal two-character sequences `\n`, `\t`, and `\r` were verified in the
+MP4 and MKV tests only; they are not independently claimed for M4A.
+
 ## Verified invariants
 
 For each container (MP4 and MKV), the test asserts:
@@ -62,6 +68,35 @@ For each container (MP4 and MKV), the test asserts:
 |-----------|-------------------|--------------------------|
 | MP4       | `1/1000`          | `10000 ms`               |
 | MKV       | `1/1000000000`    | `10023 ms`               |
+| M4A/AAC   | `1/1000`          | `10000 ms`               |
+
+## M4A/AAC evidence
+
+Reproduce:
+
+```
+go test -run '^TestChapterRoundTripM4A$' -v
+```
+
+The test passes. Observed output:
+
+```
+m4a chapter time_base = "1/1000"; source duration = 10000 ms
+```
+
+Title coverage verified in M4A: Arabic/Unicode text, spaces, `=` `;` `#`,
+double quotes, and non-final literal backslashes.
+
+M4A invariants verified via FFprobe:
+
+- The exact chapter count is preserved.
+- Every chapter title matches exactly.
+- Chapter starts are `0`, `2500`, `5250`, and `8000` ms after conversion through
+  each returned chapter's `time_base`.
+- Each chapter's end equals the next chapter's start.
+- The final chapter's end agrees with the actual probed M4A source duration
+  within 1 ms (`toleranceMs`).
+- The source M4A remains byte-identical after embedding (copy-out safety).
 
 ## Implementation conclusions
 
@@ -79,9 +114,8 @@ For each container (MP4 and MKV), the test asserts:
 
 ## Limitations
 
-- Only MP4 and MKV were tested.
-- No audio-container claim is made (e.g., no test of M4A, MP3, FLAC, OGG, or
-  similar).
+- addch chapter embedding is empirically tested in MP4, MKV, and M4A/AAC only.
+- No claim is made for MP3, FLAC, OGG, or any other audio or video container.
 - No `getch` extraction round-trip validation exists yet.
 - No `rmch` validation exists yet.
 - These results do not expand the supported-container matrix beyond the
