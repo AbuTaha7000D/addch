@@ -608,3 +608,113 @@ func TestChapterRoundTripMP4AndMKV(t *testing.T) {
 		})
 	}
 }
+
+// makeTestAudio creates a small, real M4A fixture containing AAC audio only
+// (no video), synthesized deterministically from a lavfi sine input.
+func makeTestAudio(t *testing.T, dir, durationSec string) string {
+	t.Helper()
+	path := filepath.Join(dir, "source.m4a")
+	args := []string{
+		"-hide_banner", "-loglevel", "error",
+		"-y",
+		"-f", "lavfi", "-i", "sine=frequency=440:duration=" + durationSec,
+		"-c:a", "aac",
+		path,
+	}
+	if out, err := exec.Command("ffmpeg", args...).CombinedOutput(); err != nil {
+		t.Fatalf("could not create test audio: %v\n%s", err, out)
+	}
+	return path
+}
+
+// TestChapterRoundTripM4A is the Phase 2C empirical verification that chapter
+// metadata round-trips through an M4A/AAC audio container. It embeds a valid
+// chapter set (Arabic/Unicode, punctuation, quotes, and a non-final literal
+// backslash, with a non-zero millisecond timestamp) and, via FFprobe, asserts
+// the exact chapter count, exact titles, start timestamps converted through
+// each returned chapter's time_base, the end-chain invariant (each end equals
+// the next start; the final end equals the probed source duration within
+// toleranceMs), and that the source M4A remains byte-identical.
+//
+// The test skips only when ffmpeg/ffprobe are unavailable; if the tools exist
+// but M4A remuxing or verification fails, the test fails rather than skipping.
+func TestChapterRoundTripM4A(t *testing.T) {
+	requireTools(t)
+
+	dir := t.TempDir()
+	m4a := makeTestAudio(t, dir, "10")
+
+	wantStarts := []int64{0, 2500, 5250, 8000}
+	wantTitles := []string{
+		"مقدمة مقطع صوتي",
+		`eq=a ;semi #hash "double quoted"`,
+		`Back\slash literal`,
+		"Final",
+	}
+
+	chaptersFile := filepath.Join(dir, "chapters.txt")
+	content := "00:00:00.000 مقدمة مقطع صوتي\n" +
+		"00:00:02.500 eq=a ;semi #hash \"double quoted\"\n" +
+		"00:00:05.250 Back\\slash literal\n" +
+		"00:00:08.000 Final\n"
+	if err := os.WriteFile(chaptersFile, []byte(content), 0o644); err != nil {
+		t.Fatalf("write chapters: %v", err)
+	}
+
+	srcBefore, err := os.ReadFile(m4a)
+	if err != nil {
+		t.Fatalf("read source before embed: %v", err)
+	}
+
+	_, errStr, code := runEmbedForTest(chaptersFile, m4a, "", false)
+	if code != 0 {
+		t.Fatalf("m4a embed failed with code %d:\n%s", code, errStr)
+	}
+
+	// Copy-out safety: the source audio must be untouched.
+	if srcAfter, err := os.ReadFile(m4a); err != nil {
+		t.Fatalf("read source after embed: %v", err)
+	} else if !bytes.Equal(srcBefore, srcAfter) {
+		t.Errorf("source m4a was modified")
+	}
+
+	durationMs, err := getVideoDurationMs(m4a)
+	if err != nil {
+		t.Fatalf("could not read source duration: %v", err)
+	}
+
+	out := defaultOutputPath(m4a)
+	chapters := probeChaptersRaw(t, out)
+
+	if len(chapters) != len(wantTitles) {
+		t.Fatalf("chapter count = %d, want %d", len(chapters), len(wantTitles))
+	}
+
+	t.Logf("m4a chapter time_base = %q; source duration = %d ms",
+		chapters[0].TimeBase, durationMs)
+
+	for i, wantStart := range wantStarts {
+		if got := millisecondsOf(t, chapters[i]); got != wantStart {
+			t.Errorf("chapter %d start = %d ms, want %d ms", i, got, wantStart)
+		}
+		if chapters[i].Tags.Title != wantTitles[i] {
+			t.Errorf("chapter %d title = %q, want %q", i, chapters[i].Tags.Title, wantTitles[i])
+		}
+	}
+
+	// End-chain invariant: each chapter ends where the next one starts.
+	for i := 0; i < len(chapters)-1; i++ {
+		got := endMsOf(t, chapters[i])
+		want := millisecondsOf(t, chapters[i+1])
+		if got != want {
+			t.Errorf("chapter %d end = %d ms, want next chapter start %d ms", i, got, want)
+		}
+	}
+
+	// Final chapter end equals the probed source-media duration within toleranceMs.
+	finalEnd := endMsOf(t, chapters[len(chapters)-1])
+	if diff(finalEnd, durationMs) > toleranceMs {
+		t.Errorf("final chapter end = %d ms, want source duration %d ms (within %d ms)",
+			finalEnd, durationMs, toleranceMs)
+	}
+}
