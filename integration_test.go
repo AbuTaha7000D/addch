@@ -718,3 +718,141 @@ func TestChapterRoundTripM4A(t *testing.T) {
 			finalEnd, durationMs, toleranceMs)
 	}
 }
+
+// probeToModel converts ffprobe's chapter output back into the project's chapter
+// model, the reverse of the embed step. Start timestamps are normalized through
+// each chapter's container time_base to the project's millisecond precision, so
+// Parse(TXT) and FFprobe(FFmpeg(TXT)) can be compared directly. The Line field
+// has no probe equivalent and is left as its zero value.
+func probeToModel(t *testing.T, container string, chapters []probeChapter) []Chapter {
+	t.Helper()
+	model := make([]Chapter, len(chapters))
+	for i, c := range chapters {
+		start, ok := timebaseToMillis(c.Start, c.TimeBase)
+		if !ok {
+			t.Fatalf("[%s] chapter %d: cannot convert start time_base %q", container, i, c.TimeBase)
+		}
+		model[i] = Chapter{Start: start, Title: c.Tags.Title}
+	}
+	return model
+}
+
+// probeEndsMs converts each probed chapter's stored end to milliseconds via its
+// time_base, so the end-chain (each end equals the next chapter's start; the
+// final end equals the media duration) can be verified against the derived ends
+// of the parsed model.
+func probeEndsMs(t *testing.T, container string, chapters []probeChapter) []int64 {
+	t.Helper()
+	ends := make([]int64, len(chapters))
+	for i, c := range chapters {
+		end, ok := timebaseToMillis(c.End, c.TimeBase)
+		if !ok {
+			t.Fatalf("[%s] chapter %d: cannot convert end time_base %q", container, i, c.TimeBase)
+		}
+		ends[i] = end
+	}
+	return ends
+}
+
+// requireRoundTripEqual proves the semantic equality Parse(TXT) ==
+// FFprobe(FFmpeg(TXT)) for one container: the probed model must match the parsed
+// model in count, order, start (within toleranceMs), and exact title, and each
+// probed end must equal the derived end (the next chapter's start, or the media
+// duration for the final chapter) within toleranceMs. Failures identify the
+// container and chapter index with both expected and actual values.
+func requireRoundTripEqual(t *testing.T, container string, parsed []Chapter, durationMs int64, probed []Chapter, probedEnds []int64) {
+	t.Helper()
+	if len(probed) != len(parsed) {
+		t.Errorf("[%s] chapter count = %d, want %d", container, len(probed), len(parsed))
+		return
+	}
+	for i := range parsed {
+		if diff(probed[i].Start, parsed[i].Start) > toleranceMs {
+			t.Errorf("[%s] chapter %d start = %d ms, want %d ms", container, i, probed[i].Start, parsed[i].Start)
+		}
+		if probed[i].Title != parsed[i].Title {
+			t.Errorf("[%s] chapter %d title = %q, want %q", container, i, probed[i].Title, parsed[i].Title)
+		}
+		wantEnd := durationMs
+		if i+1 < len(parsed) {
+			wantEnd = parsed[i+1].Start
+		}
+		if diff(probedEnds[i], wantEnd) > toleranceMs {
+			t.Errorf("[%s] chapter %d end = %d ms, want %d ms", container, i, probedEnds[i], wantEnd)
+		}
+	}
+}
+
+// TestRoundTripParseEqualsProbe is the Phase 2E round-trip proof. For every
+// currently supported container (MP4, MKV, M4A/AAC) it establishes, using real
+// FFmpeg/FFprobe:
+//
+//	Parse(TXT) == FFprobe(FFmpeg(TXT))
+//
+// A single adversarial chapter fixture (Arabic/Unicode, spaces, `=`, `;`, `#`,
+// quotes, literal backslash sequences, an exact-zero first chapter at 00:00:00,
+// and fractional timestamps through the supported duration boundary) is parsed
+// with the production parser (step 1), embedded by the production addch pipeline
+// (step 2), probed with real ffprobe (step 3), converted back into the project's
+// chapter model inside this test (step 4), and compared at the project's
+// millisecond precision (step 5). Only media produced through addch's own
+// supported path is proven; arbitrary foreign chapter structures are out of
+// scope. The test skips only when ffmpeg/ffprobe are unavailable; while the
+// tools are installed, any mismatch fails.
+func TestRoundTripParseEqualsProbe(t *testing.T) {
+	for _, container := range []string{"mp4", "mkv", "m4a"} {
+		t.Run(container, func(t *testing.T) {
+			requireTools(t)
+
+			dir := t.TempDir()
+			var video string
+			if container == "m4a" {
+				video = makeTestAudio(t, dir, "10")
+			} else {
+				video = makeTestContainer(t, dir, container, "10")
+			}
+
+			// One fixture for every container, reusing the titles already proven
+			// in the Phase 2 MP4/MKV/M4A integration coverage.
+			chaptersFile := filepath.Join(dir, "chapters.txt")
+			content := "00:00:00.000 مقدمة With Spaces and حروف\n" +
+				"00:00:02.500 eq=a ;semi #hash \"double quoted\"\n" +
+				"00:00:05.250 Back\\slash literal\\nsequence\n" +
+				"00:00:08.000 literal\\tsequence literal\\rreturn mixed العربية mixed\n"
+			if err := os.WriteFile(chaptersFile, []byte(content), 0o644); err != nil {
+				t.Fatalf("write chapters: %v", err)
+			}
+
+			// Step 1: parse the fixture with the production parser/model.
+			parsed, err := ParseChaptersFile(chaptersFile)
+			if err != nil {
+				t.Fatalf("[%s] parse chapters: %v", container, err)
+			}
+			if len(parsed) != 4 {
+				t.Fatalf("[%s] parsed chapter count = %d, want 4", container, len(parsed))
+			}
+
+			// Step 2: embed with the production addch pipeline (copy-out).
+			_, errStr, code := runEmbedForTest(chaptersFile, video, "", false)
+			if code != 0 {
+				t.Fatalf("[%s] embed failed with code %d:\n%s", container, code, errStr)
+			}
+
+			durationMs, err := getVideoDurationMs(video)
+			if err != nil {
+				t.Fatalf("[%s] could not read source duration: %v", container, err)
+			}
+
+			// Steps 3-4: probe the output and convert back into the project model.
+			probed := probeChaptersRaw(t, defaultOutputPath(video))
+			got := probeToModel(t, container, probed)
+			gotEnds := probeEndsMs(t, container, probed)
+
+			t.Logf("[%s] chapter time_base = %q; source duration = %d ms",
+				container, probed[0].TimeBase, durationMs)
+
+			// Step 5: normalized semantic comparison.
+			requireRoundTripEqual(t, container, parsed, durationMs, got, gotEnds)
+		})
+	}
+}
