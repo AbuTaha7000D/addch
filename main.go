@@ -5,8 +5,9 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
+
+	"github.com/abutaha/addch/internal/fsutil"
 )
 
 func main() {
@@ -91,16 +92,16 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	// 5. Determine output path.
 	output := pa.output
 	if output == "" {
-		output = defaultOutputPath(pa.video)
+		output = fsutil.DefaultOutputPath(pa.video)
 	}
 
 	// Guard against overwriting the video input itself.
-	if samePath(output, pa.video) {
+	if fsutil.SamePath(output, pa.video) {
 		fmt.Fprintf(stderr, "Error: output path %q would overwrite the input video; choose a different --output\n", output)
 		return 1
 	}
 	// Guard against overwriting the user's chapter file (another input).
-	if samePath(output, pa.chapters) {
+	if fsutil.SamePath(output, pa.chapters) {
 		fmt.Fprintf(stderr, "Error: output path %q would overwrite the chapter file; choose a different --output\n", output)
 		return 1
 	}
@@ -134,7 +135,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	outputExt := outputExtension(output)
+	outputExt := fsutil.OutputExtension(output)
 
 	// 9b. Run the remux with signal handling. The signal channel is registered
 	// BEFORE the child FFmpeg process is started. This is required: if a
@@ -162,7 +163,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	case sig := <-interrupted:
 		rp.interrupt() // kill, then wait for the child to actually stop
 		signal.Stop(interrupted)
-		cleanupOutput(output)
+		fsutil.CleanupFile(output)
 		os.Remove(metaPath)
 		fmt.Fprintln(stderr, "\nInterrupted; no output was written.")
 		// Follow the conventional shell exit codes for a caught signal:
@@ -177,14 +178,14 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 
 	os.Remove(metaPath) // always clean up temp metadata
 	if err != nil {
-		cleanupOutput(output)
+		fsutil.CleanupFile(output)
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
 
 	// 10. Verify.
 	if err := verifyChapters(output, chapters, durationMs); err != nil {
-		cleanupOutput(output)
+		fsutil.CleanupFile(output)
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
@@ -193,39 +194,6 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "✓ Verification passed")
 	fmt.Fprintf(stdout, "\nOutput:\n%s\n", output)
 	return 0
-}
-
-// cleanupOutput removes a (possibly partial) output file, ignoring errors.
-func cleanupOutput(output string) {
-	if err := os.Remove(output); err != nil && !os.IsNotExist(err) {
-		// Deliberately ignore cleanup errors; the file may belong to another process.
-		_ = err
-	}
-}
-
-// samePath reports whether two paths refer to the same underlying file. It
-// normalizes each path to an absolute, cleaned form and, when both paths exist,
-// resolves symlinks so that a symlinked output pointing at the input is also
-// detected. This guarantees the input video can never be overwritten via the
-// output path, including through identical paths, relative vs absolute forms,
-// normalization differences, or symlinks.
-func samePath(a, b string) bool {
-	resolve := func(p string) (string, bool) {
-		abs, err := filepath.Abs(p)
-		if err != nil {
-			return "", false
-		}
-		abs = filepath.Clean(abs)
-		// Resolve symlinks only when the path exists; for a not-yet-created output
-		// we fall back to the cleaned absolute form.
-		if ev, err := filepath.EvalSymlinks(abs); err == nil {
-			return ev, true
-		}
-		return abs, true
-	}
-	ra, oka := resolve(a)
-	rb, okb := resolve(b)
-	return oka && okb && ra == rb
 }
 
 func writeExampleFile() error {

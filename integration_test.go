@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/abutaha/addch/internal/fsutil"
 )
 
 // requireTools skips integration tests if ffmpeg/ffprobe are unavailable.
@@ -62,7 +64,7 @@ func TestEndToEnd(t *testing.T) {
 		t.Fatalf("write chapters: %v", err)
 	}
 
-	expectedOut := defaultOutputPath(video)
+	expectedOut := fsutil.DefaultOutputPath(video)
 	_, errStr, code := runEmbedForTest(chaptersFile, video, "", false)
 	if code != 0 {
 		t.Fatalf("runEmbed failed with code %d:\n%s", code, errStr)
@@ -188,7 +190,7 @@ func TestEndToEndBackslashInTitle(t *testing.T) {
 		t.Fatalf("runEmbed failed with code %d:\n%s", code, errStr)
 	}
 
-	outPath := defaultOutputPath(video)
+	outPath := fsutil.DefaultOutputPath(video)
 	got := probeChaptersRaw(t, outPath)
 	want := []string{`Back\slash test`, `Win\File\Path & eq=b`, "Emoji 🎬"}
 	if len(got) != len(want) {
@@ -228,7 +230,7 @@ func TestEndToEndTitleEndingInBackslashFails(t *testing.T) {
 	}
 
 	// The failed run must not leave any output or temp metadata behind.
-	if _, err := os.Stat(defaultOutputPath(video)); !os.IsNotExist(err) {
+	if _, err := os.Stat(fsutil.DefaultOutputPath(video)); !os.IsNotExist(err) {
 		t.Error("no output file should exist after the rejected run")
 	}
 	if countTempMetadata() != 0 {
@@ -275,7 +277,7 @@ func TestEndToEndMKVContainer(t *testing.T) {
 		t.Fatalf("mkv run failed with code %d:\n%s", code, errStr)
 	}
 
-	outPath := defaultOutputPath(mkv)
+	outPath := fsutil.DefaultOutputPath(mkv)
 	chapters := probeChaptersRaw(t, outPath)
 	if len(chapters) != 3 {
 		t.Fatalf("expected 3 chapters, got %d", len(chapters))
@@ -368,7 +370,7 @@ func TestEndToEndPreservesChapterFileAndCleansTemp(t *testing.T) {
 	}
 
 	// Output contains the expected chapters.
-	outPath := defaultOutputPath(video)
+	outPath := fsutil.DefaultOutputPath(video)
 	chapters := probeChaptersRaw(t, outPath)
 	if len(chapters) != 3 || chapters[1].Tags.Title != "Precise" {
 		t.Errorf("output chapters wrong: %+v", chapters)
@@ -467,7 +469,7 @@ func TestEndToEndSpecialCharacterTitles(t *testing.T) {
 		t.Fatalf("run failed code %d:\n%s", code, errStr)
 	}
 
-	got := probeChaptersRaw(t, defaultOutputPath(video))
+	got := probeChaptersRaw(t, fsutil.DefaultOutputPath(video))
 	want := []string{"eq=a ;semi #hash", `Back\slash test`, "arab اختبار emoji 🎬"}
 	if len(got) != len(want) {
 		t.Fatalf("expected %d chapters, got %d", len(want), len(got))
@@ -568,7 +570,7 @@ func TestChapterRoundTripMP4AndMKV(t *testing.T) {
 				t.Fatalf("[%s] could not read source duration: %v", container, err)
 			}
 
-			out := defaultOutputPath(video)
+			out := fsutil.DefaultOutputPath(video)
 			chapters := probeChaptersRaw(t, out)
 
 			if len(chapters) != len(wantTitles) {
@@ -683,7 +685,7 @@ func TestChapterRoundTripM4A(t *testing.T) {
 		t.Fatalf("could not read source duration: %v", err)
 	}
 
-	out := defaultOutputPath(m4a)
+	out := fsutil.DefaultOutputPath(m4a)
 	chapters := probeChaptersRaw(t, out)
 
 	if len(chapters) != len(wantTitles) {
@@ -844,7 +846,7 @@ func TestRoundTripParseEqualsProbe(t *testing.T) {
 			}
 
 			// Steps 3-4: probe the output and convert back into the project model.
-			probed := probeChaptersRaw(t, defaultOutputPath(video))
+			probed := probeChaptersRaw(t, fsutil.DefaultOutputPath(video))
 			got := probeToModel(t, container, probed)
 			gotEnds := probeEndsMs(t, container, probed)
 
