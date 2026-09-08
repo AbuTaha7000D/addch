@@ -3,6 +3,8 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"github.com/abutaha/addch/internal/chapters"
 )
 
 func TestParseDurationToMs(t *testing.T) {
@@ -90,7 +92,7 @@ func TestGetVideoDurationInvalidFile(t *testing.T) {
 }
 
 func TestCompareChapters(t *testing.T) {
-	expected := []Chapter{
+	expected := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},
 		{Start: 5000, Title: "Part", Line: 2},
 	}

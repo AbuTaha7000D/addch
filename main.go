@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/abutaha/addch/internal/chapters"
 	"github.com/abutaha/addch/internal/fsutil"
 )
 
@@ -66,14 +67,14 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "✓ Dependencies found")
 
 	// 2. Parse chapters.
-	chapters, err := ParseChaptersFile(pa.chapters)
+	chs, err := chapters.ParseFile(pa.chapters)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
 
 	// 3. Structural validation.
-	if err := ValidateChapters(chapters); err != nil {
+	if err := chapters.Validate(chs); err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
@@ -121,14 +122,14 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	}
 
 	// 8. Validate chapters against duration.
-	if err := ValidateAgainstDuration(chapters, durationMs); err != nil {
+	if err := chapters.ValidateDuration(chs, durationMs); err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
 	}
 	fmt.Fprintln(stdout, "✓ Video duration checked")
 
 	// 9. Generate metadata and remux.
-	meta := buildMetadata(chapters, durationMs)
+	meta := buildMetadata(chs, durationMs)
 	metaPath, err := writeTempMetadata(meta)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
@@ -184,7 +185,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	}
 
 	// 10. Verify.
-	if err := verifyChapters(output, chapters, durationMs); err != nil {
+	if err := verifyChapters(output, chs, durationMs); err != nil {
 		fsutil.CleanupFile(output)
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1

@@ -5,10 +5,12 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/abutaha/addch/internal/chapters"
 )
 
 func TestBuildMetadata(t *testing.T) {
-	chapters := []Chapter{
+	chapters := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},
 		{Start: 330000, Title: "Chapter 2", Line: 2},
 		{Start: 6150000, Title: "Final", Line: 3},
@@ -41,7 +43,7 @@ title=Final
 }
 
 func TestBuildMetadataLastEndsAtDuration(t *testing.T) {
-	chapters := []Chapter{
+	chapters := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},
 		{Start: 3000, Title: "Second", Line: 2},
 	}
@@ -53,7 +55,7 @@ func TestBuildMetadataLastEndsAtDuration(t *testing.T) {
 }
 
 func TestBuildMetadataSingleChapter(t *testing.T) {
-	chapters := []Chapter{{Start: 0, Title: "Whole", Line: 1}}
+	chapters := []chapters.Chapter{{Start: 0, Title: "Whole", Line: 1}}
 	got := buildMetadata(chapters, 50000)
 	if !strings.Contains(got, "START=0\n") || !strings.Contains(got, "END=50000\n") {
 		t.Errorf("single chapter metadata incorrect:\n%s", got)
@@ -64,7 +66,7 @@ func TestBuildMetadataSingleChapter(t *testing.T) {
 }
 
 func TestBuildMetadataDoesNotMutateInput(t *testing.T) {
-	chapters := []Chapter{
+	chapters := []chapters.Chapter{
 		{Start: 5000, Title: "b", Line: 2},
 		{Start: 0, Title: "a", Line: 1},
 	}
@@ -76,7 +78,7 @@ func TestBuildMetadataDoesNotMutateInput(t *testing.T) {
 }
 
 func TestBuildMetadataSorts(t *testing.T) {
-	chapters := []Chapter{
+	chapters := []chapters.Chapter{
 		{Start: 5000, Title: "later", Line: 2},
 		{Start: 0, Title: "earlier", Line: 1},
 	}
@@ -108,7 +110,7 @@ func TestEscapeMetadataTitle(t *testing.T) {
 }
 
 func TestBuildMetadataEscapesBackslash(t *testing.T) {
-	chapters := []Chapter{{Start: 0, Title: `Back\slash`, Line: 1}}
+	chapters := []chapters.Chapter{{Start: 0, Title: `Back\slash`, Line: 1}}
 	got := buildMetadata(chapters, 1000)
 	if !strings.Contains(got, `title=Back\\slash`) {
 		t.Errorf("expected escaped backslash in metadata:\n%s", got)
@@ -120,7 +122,7 @@ func TestBuildMetadataEscapesBackslash(t *testing.T) {
 
 func TestBuildMetadataSpecialChars(t *testing.T) {
 	// '=', ';' and '#' must pass through unchanged; only backslash is escaped.
-	chapters := []Chapter{
+	chapters := []chapters.Chapter{
 		{Start: 0, Title: "eq=a ;semi #hash", Line: 1},
 		{Start: 5000, Title: `back\slash`, Line: 2},
 	}

@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+
+	"github.com/abutaha/addch/internal/chapters"
 )
 
 // escapeMetadataTitle escapes a chapter title for embedding in an FFMETADATA1
@@ -24,13 +26,13 @@ func escapeMetadataTitle(title string) string {
 // given chapters. Each chapter's END is the next chapter's START, and the final
 // chapter's END is the video duration. Timestamps are stored in milliseconds
 // via TIMEBASE=1/1000.
-func buildMetadata(chapters []Chapter, durationMs int64) string {
+func buildMetadata(chs []chapters.Chapter, durationMs int64) string {
 	var b strings.Builder
 	b.WriteString(";FFMETADATA1\n")
 
 	// Copy the input so we do not mutate the caller's slice.
-	sorted := make([]Chapter, len(chapters))
-	copy(sorted, chapters)
+	sorted := make([]chapters.Chapter, len(chs))
+	copy(sorted, chs)
 	sort.SliceStable(sorted, func(i, j int) bool { return sorted[i].Start < sorted[j].Start })
 
 	for i := range sorted {

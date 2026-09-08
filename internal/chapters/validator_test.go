@@ -1,4 +1,4 @@
-package main
+package chapters
 
 import (
 	"strings"
@@ -9,20 +9,20 @@ func mk(line int, start int64, title string) Chapter {
 	return Chapter{Start: start, Title: title, Line: line}
 }
 
-func TestValidateChapters(t *testing.T) {
+func TestValidate(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		ch := []Chapter{
 			mk(1, 0, "Intro"),
 			mk(2, 330000, "Part 2"),
 			mk(3, 6150000, "Final"),
 		}
-		if err := ValidateChapters(ch); err != nil {
+		if err := Validate(ch); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("empty", func(t *testing.T) {
-		err := ValidateChapters(nil)
+		err := Validate(nil)
 		if err == nil {
 			t.Fatal("expected error for empty chapters")
 		}
@@ -33,7 +33,7 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("first not at zero", func(t *testing.T) {
 		ch := []Chapter{mk(1, 1000, "Intro")}
-		err := ValidateChapters(ch)
+		err := Validate(ch)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -44,7 +44,7 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("not sorted", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, "a"), mk(2, 5000, "b"), mk(3, 2000, "c")}
-		err := ValidateChapters(ch)
+		err := Validate(ch)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -55,7 +55,7 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("duplicate timestamp", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, "a"), mk(2, 5000, "b"), mk(3, 5000, "c")}
-		err := ValidateChapters(ch)
+		err := Validate(ch)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -66,7 +66,7 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("title with newline", func(t *testing.T) {
 		ch := []Chapter{{Start: 0, Title: "bad\ntitle", Line: 1}}
-		err := ValidateChapters(ch)
+		err := Validate(ch)
 		if err == nil {
 			t.Fatal("expected error for title with newline")
 		}
@@ -74,7 +74,7 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("title ending in backslash rejected", func(t *testing.T) {
 		ch := []Chapter{{Start: 0, Title: `Trail\`, Line: 1}}
-		err := ValidateChapters(ch)
+		err := Validate(ch)
 		if err == nil {
 			t.Fatal("expected error for title ending in a backslash")
 		}
@@ -85,30 +85,30 @@ func TestValidateChapters(t *testing.T) {
 
 	t.Run("mid-string backslash allowed", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, `Back\slash`), mk(2, 5000, "b")}
-		if err := ValidateChapters(ch); err != nil {
+		if err := Validate(ch); err != nil {
 			t.Fatalf("mid-string backslash should be allowed: %v", err)
 		}
 	})
 }
 
-func TestValidateAgainstDuration(t *testing.T) {
+func TestValidateDuration(t *testing.T) {
 	t.Run("within duration ok", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, "a"), mk(2, 1000, "b")}
-		if err := ValidateAgainstDuration(ch, 2000); err != nil {
+		if err := ValidateDuration(ch, 2000); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 
 	t.Run("exactly at duration ok", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, "a"), mk(2, 5000, "b")}
-		if err := ValidateAgainstDuration(ch, 5000); err != nil {
+		if err := ValidateDuration(ch, 5000); err != nil {
 			t.Fatalf("expected == duration to be allowed, got error: %v", err)
 		}
 	})
 
 	t.Run("beyond duration fails", func(t *testing.T) {
 		ch := []Chapter{mk(1, 0, "a"), mk(2, 5001, "b")}
-		err := ValidateAgainstDuration(ch, 5000)
+		err := ValidateDuration(ch, 5000)
 		if err == nil {
 			t.Fatal("expected error")
 		}
@@ -133,8 +133,8 @@ func TestFormatMilliseconds(t *testing.T) {
 		{359999000, "99:59:59"},
 	}
 	for _, c := range cases {
-		if got := formatMilliseconds(c.in); got != c.want {
-			t.Errorf("formatMilliseconds(%d) = %q, want %q", c.in, got, c.want)
+		if got := FormatMilliseconds(c.in); got != c.want {
+			t.Errorf("FormatMilliseconds(%d) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }

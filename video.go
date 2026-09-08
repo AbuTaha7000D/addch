@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/abutaha/addch/internal/chapters"
 )
 
 // probeJSON runs ffprobe with the given arguments and returns its stdout.
@@ -166,7 +168,7 @@ func timebaseToMillis(value int64, tb string) (int64, bool) {
 
 // verifyChapters uses ffprobe to confirm that the output file contains exactly
 // the chapters we expected, with matching titles and start/end times.
-func verifyChapters(outputPath string, expected []Chapter, durationMs int64) error {
+func verifyChapters(outputPath string, expected []chapters.Chapter, durationMs int64) error {
 	out, err := probeJSON("-show_chapters", outputPath)
 	if err != nil {
 		return fmt.Errorf("verification failed for %q: %v", outputPath, err)
@@ -181,7 +183,7 @@ func verifyChapters(outputPath string, expected []Chapter, durationMs int64) err
 // compareChapters verifies that the probeChapter list matches the expected
 // chapters in count, order, titles, and start/end times (within toleranceMs).
 // It is pure and unit-testable without a real file.
-func compareChapters(got []probeChapter, expected []Chapter, durationMs int64) error {
+func compareChapters(got []probeChapter, expected []chapters.Chapter, durationMs int64) error {
 	if len(got) != len(expected) {
 		return fmt.Errorf("verification failed: expected %d chapters, found %d",
 			len(expected), len(got))
@@ -215,11 +217,11 @@ func compareChapters(got []probeChapter, expected []Chapter, durationMs int64) e
 		}
 		if diff(expected[i].Start, gotStart) > toleranceMs {
 			return fmt.Errorf("verification failed: chapter %d start is %s, expected %s",
-				i+1, formatMilliseconds(gotStart), formatMilliseconds(expected[i].Start))
+				i+1, chapters.FormatMilliseconds(gotStart), chapters.FormatMilliseconds(expected[i].Start))
 		}
 		if diff(expectedEnds[i], gotEnd) > toleranceMs {
 			return fmt.Errorf("verification failed: chapter %d end is %s, expected %s",
-				i+1, formatMilliseconds(gotEnd), formatMilliseconds(expectedEnds[i]))
+				i+1, chapters.FormatMilliseconds(gotEnd), chapters.FormatMilliseconds(expectedEnds[i]))
 		}
 	}
 	return nil

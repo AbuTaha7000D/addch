@@ -1,4 +1,4 @@
-package main
+package chapters
 
 import (
 	"bufio"
@@ -8,17 +8,7 @@ import (
 	"strings"
 )
 
-// Chapter is a single parsed chapter entry.
-type Chapter struct {
-	// Start is the start timestamp in milliseconds.
-	Start int64
-	// Title is the chapter title.
-	Title string
-	// Line is the 1-based line number in the input file where this chapter appeared.
-	Line int
-}
-
-// ParseChaptersFile reads and parses a chapters definition file.
+// ParseFile reads and parses a chapters definition file.
 //
 // The expected format per non-empty line is:
 //
@@ -27,16 +17,17 @@ type Chapter struct {
 //
 // Blank lines are skipped. A UTF-8 BOM at the start of the file is stripped.
 // Both LF ("\n") and CRLF ("\r\n") line endings are accepted.
-func ParseChaptersFile(path string) ([]Chapter, error) {
+func ParseFile(path string) ([]Chapter, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("cannot open chapters file %q: %w", path, err)
 	}
 	defer f.Close()
-	return parseChapters(f)
+	return Parse(f)
 }
 
-func parseChapters(r io.Reader) ([]Chapter, error) {
+// Parse reads and parses chapters from r.
+func Parse(r io.Reader) ([]Chapter, error) {
 	scanner := bufio.NewScanner(r)
 	// Bump the buffer to allow long titles.
 	scanner.Buffer(make([]byte, 64*1024), 1024*1024)

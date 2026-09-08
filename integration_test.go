@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/abutaha/addch/internal/chapters"
 	"github.com/abutaha/addch/internal/fsutil"
 )
 
@@ -726,15 +727,15 @@ func TestChapterRoundTripM4A(t *testing.T) {
 // each chapter's container time_base to the project's millisecond precision, so
 // Parse(TXT) and FFprobe(FFmpeg(TXT)) can be compared directly. The Line field
 // has no probe equivalent and is left as its zero value.
-func probeToModel(t *testing.T, container string, chapters []probeChapter) []Chapter {
+func probeToModel(t *testing.T, container string, probed []probeChapter) []chapters.Chapter {
 	t.Helper()
-	model := make([]Chapter, len(chapters))
-	for i, c := range chapters {
+	model := make([]chapters.Chapter, len(probed))
+	for i, c := range probed {
 		start, ok := timebaseToMillis(c.Start, c.TimeBase)
 		if !ok {
 			t.Fatalf("[%s] chapter %d: cannot convert start time_base %q", container, i, c.TimeBase)
 		}
-		model[i] = Chapter{Start: start, Title: c.Tags.Title}
+		model[i] = chapters.Chapter{Start: start, Title: c.Tags.Title}
 	}
 	return model
 }
@@ -762,7 +763,7 @@ func probeEndsMs(t *testing.T, container string, chapters []probeChapter) []int6
 // probed end must equal the derived end (the next chapter's start, or the media
 // duration for the final chapter) within toleranceMs. Failures identify the
 // container and chapter index with both expected and actual values.
-func requireRoundTripEqual(t *testing.T, container string, parsed []Chapter, durationMs int64, probed []Chapter, probedEnds []int64) {
+func requireRoundTripEqual(t *testing.T, container string, parsed []chapters.Chapter, durationMs int64, probed []chapters.Chapter, probedEnds []int64) {
 	t.Helper()
 	if len(probed) != len(parsed) {
 		t.Errorf("[%s] chapter count = %d, want %d", container, len(probed), len(parsed))
@@ -826,7 +827,7 @@ func TestRoundTripParseEqualsProbe(t *testing.T) {
 			}
 
 			// Step 1: parse the fixture with the production parser/model.
-			parsed, err := ParseChaptersFile(chaptersFile)
+			parsed, err := chapters.ParseFile(chaptersFile)
 			if err != nil {
 				t.Fatalf("[%s] parse chapters: %v", container, err)
 			}

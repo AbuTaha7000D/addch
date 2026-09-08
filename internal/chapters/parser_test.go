@@ -1,4 +1,4 @@
-package main
+package chapters
 
 import (
 	"strings"
@@ -57,7 +57,7 @@ func TestParseTimestamp(t *testing.T) {
 func TestParseChapters(t *testing.T) {
 	t.Run("valid basic", func(t *testing.T) {
 		input := "00:00:00 Intro\n00:05:30 Chapter 2\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -74,7 +74,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("ignores blank lines", func(t *testing.T) {
 		input := "00:00:00 Intro\n\n\n00:05:30 Part 2\n  \n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -85,7 +85,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("handles BOM", func(t *testing.T) {
 		input := "\uFEFF00:00:00 Intro\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -96,7 +96,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("handles CRLF", func(t *testing.T) {
 		input := "00:00:00 Intro\r\n00:05:30 Part 2\r\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -110,7 +110,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("trims surrounding whitespace in title", func(t *testing.T) {
 		input := "00:00:00   Spaced Title  \n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -121,7 +121,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("mixed precision allowed", func(t *testing.T) {
 		input := "00:00:00 Intro\n00:00:01.250 Part\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -132,7 +132,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("unicode title", func(t *testing.T) {
 		input := "00:00:00 مقدمة\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -142,21 +142,21 @@ func TestParseChapters(t *testing.T) {
 	})
 
 	t.Run("invalid format", func(t *testing.T) {
-		_, err := parseChapters(strings.NewReader("not a timestamp\n"))
+		_, err := Parse(strings.NewReader("not a timestamp\n"))
 		if err == nil {
 			t.Fatal("expected an error for invalid format")
 		}
 	})
 
 	t.Run("missing title", func(t *testing.T) {
-		_, err := parseChapters(strings.NewReader("00:00:00\n"))
+		_, err := Parse(strings.NewReader("00:00:00\n"))
 		if err == nil {
 			t.Fatal("expected an error for missing title")
 		}
 	})
 
 	t.Run("empty input", func(t *testing.T) {
-		ch, err := parseChapters(strings.NewReader(""))
+		ch, err := Parse(strings.NewReader(""))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -167,7 +167,7 @@ func TestParseChapters(t *testing.T) {
 
 	t.Run("title containing colon", func(t *testing.T) {
 		input := "00:00:00 Module 3: Advanced\n"
-		ch, err := parseChapters(strings.NewReader(input))
+		ch, err := Parse(strings.NewReader(input))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}

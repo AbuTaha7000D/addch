@@ -68,7 +68,7 @@ end of every approved task so the next task is always explicit.
 
 - [ ] Create `internal/chapters` for parsing, validation, and serialization.
 - [ ] Create `internal/media` for FFmpeg/FFprobe, remuxing, and verification.
-- [ ] Create `internal/fsutil` for paths, matching, and discovery.
+- [x] Create `internal/fsutil` for paths, matching, and discovery.
 - [ ] Create `internal/batch` for orchestration and result reporting.
 - [ ] Move the add command entry point to `cmd/addch/main.go`.
 - [ ] Preserve v0.1 behavior and keep all existing tests passing.
