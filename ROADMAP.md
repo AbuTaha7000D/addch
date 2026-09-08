@@ -13,11 +13,11 @@ end of every approved task so the next task is always explicit.
 
 - Current branch: `feature/chapter-toolkit`
 - Baseline tests: passing (`go test ./...`)
-- Current phase: **Phase 2 complete** — next: Phase 3 (shared core refactor)
-- Last completed deliverable: Phase 2 empirical verification, documented in
-  `FFMPEG_VERIFICATION.md` and finalized for M4A/AAC in `9f22159`, completed
-  by the round-trip proof `TestRoundTripParseEqualsProbe` in
-  `integration_test.go` (committed in `236078f`).
+- Current phase: **Phase 4 (addch batch mode)**
+- Previous phase: **Phase 3 complete** (shared core refactor, committed in
+  `9dc3710`).
+- Last completed deliverable: Task 4.1 candidate discovery and sidecar matching
+  in `internal/fsutil` (committed in `38d0e50`).
 
 ## Phase 0 — Baseline and scope decisions
 
@@ -73,9 +73,12 @@ end of every approved task so the next task is always explicit.
 - [x] Create `internal/fsutil` for paths, matching, and discovery. (Committed in `5222d1a`.)
 - [x] Create `internal/batch` for orchestration and result reporting.
   (Committed in `ad1e46a`.)
-- [ ] Move the add command entry point to `cmd/addch/main.go`.
-- [ ] Preserve v0.1 behavior and keep all existing tests passing.
-- [ ] Phase exit: refactor is behavior-preserving and tested.
+- [x] Move the add command entry point to `cmd/addch/main.go`.
+  (Committed in `9dc3710`.)
+- [x] Preserve v0.1 behavior and keep all existing tests passing.
+  (Committed in `9dc3710`.)
+- [x] Phase exit: refactor is behavior-preserving and tested.
+  (Committed in `9dc3710`.)
 
 ## Phase 4 — addch batch mode
 
