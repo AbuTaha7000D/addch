@@ -13,11 +13,10 @@ end of every approved task so the next task is always explicit.
 
 - Current branch: `feature/chapter-toolkit`
 - Baseline tests: passing (`go test ./...`)
-- Current phase: **Phase 4 (addch batch mode)**
-- Previous phase: **Phase 3 complete** (shared core refactor, committed in
-  `9dc3710`).
-- Last completed deliverable: Task 4.1 candidate discovery and sidecar matching
-  in `internal/fsutil` (committed in `38d0e50`).
+- Current phase: **Phase 5 (rmch)** — next: implement the `rmch` binary.
+- Previous phase: **Phase 4 complete** (addch batch mode).
+- Last completed deliverable: Phase 4 exit gate — batch end-to-end and
+  interrupt integration tests (committed in `f9372b9`).
 
 ## Phase 0 — Baseline and scope decisions
 
@@ -92,7 +91,7 @@ end of every approved task so the next task is always explicit.
   failed totals. (Committed in `a75bb7b`.)
 - [x] Handle Ctrl+C/SIGTERM: stop scheduling, kill and reap current FFmpeg,
   clean temporary and partial files, then exit 130/143. (Committed in `a75bb7b`.)
-- [ ] Phase exit: batch and interrupt integration tests pass.
+- [x] Phase exit: batch and interrupt integration tests pass. (Committed in `f9372b9`.)
 
 ## Phase 5 — rmch
 
