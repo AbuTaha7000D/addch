@@ -82,8 +82,8 @@ end of every approved task so the next task is always explicit.
 
 ## Phase 4 — addch batch mode
 
-- [ ] Add shallow `--dir` and recursive `--recursive` modes.
-- [ ] Reject using `--dir` and `--recursive` together.
+- [x] Add shallow `--dir` and recursive `--recursive` modes. (Committed in `931d072`, `02b0259`.)
+- [x] Reject using `--dir` and `--recursive` together. (Committed in `931d072`, `02b0259`.)
 - [ ] Discover candidates using: supported media extension + exact matching
   `<stem>.txt` sidecar + FFprobe validation.
 - [ ] Match sidecars correctly with Unicode and spaces.
