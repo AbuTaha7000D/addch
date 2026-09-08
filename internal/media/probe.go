@@ -233,3 +233,40 @@ func diff(a, b int64) int64 {
 	}
 	return b - a
 }
+
+// CountChapters returns the number of chapter markers in a media file as
+// reported by ffprobe -show_chapters. This is the chapter-stripping (rmch)
+// analogue of the embed-side probe; it is also used up front to decide whether
+// an input has any chapters to remove.
+func CountChapters(path string) (int, error) {
+	out, err := ProbeJSON("-show_chapters", path)
+	if err != nil {
+		return 0, fmt.Errorf("could not read chapters for %q: %v", path, err)
+	}
+	var pc probeChapters
+	if err := json.Unmarshal(out, &pc); err != nil {
+		return 0, fmt.Errorf("could not parse ffprobe chapter output for %q: %v", path, err)
+	}
+	return len(pc.Chapters), nil
+}
+
+// VerifyNoChapters confirms that a chapter-stripped output has zero chapters,
+// as reported by ffprobe -show_chapters. The contract is zero chapters only; a
+// residual MP4 bin_data/data stream (a chapter-track artifact) is acceptable.
+func VerifyNoChapters(outputPath string) error {
+	n, err := CountChapters(outputPath)
+	if err != nil {
+		return fmt.Errorf("verification failed for %q: %v", outputPath, err)
+	}
+	return CompareNoChapters(n)
+}
+
+// CompareNoChapters is the pure counterpart of VerifyNoChapters: it returns an
+// error unless the reported chapter count is zero. Unit-testable without a real
+// file or ffprobe.
+func CompareNoChapters(count int) error {
+	if count != 0 {
+		return fmt.Errorf("verification failed: expected 0 chapters, found %d", count)
+	}
+	return nil
+}

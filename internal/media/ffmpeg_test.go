@@ -200,6 +200,82 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 }
 
+func TestBuildStripArgs(t *testing.T) {
+	has := func(args []string, needle string) bool {
+		for _, a := range args {
+			if a == needle {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Overwrite => -y present; no overwrite => -y absent.
+	argsOver := BuildStripArgs("in.mp4", "out.mp4", ".mp4", true)
+	if !has(argsOver, "-y") {
+		t.Errorf("expected -y when overwrite is true: %v", argsOver)
+	}
+	argsNo := BuildStripArgs("in.mp4", "out.mp4", ".mp4", false)
+	if has(argsNo, "-y") {
+		t.Errorf("-y must NOT be present without --overwrite: %v", argsNo)
+	}
+
+	// The strip contract: all streams, metadata preserved, chapters disabled.
+	for _, flag := range []string{"-map", "0", "-map_metadata", "0", "-map_chapters", "-1", "-c", "copy"} {
+		if !has(argsNo, flag) {
+			t.Errorf("missing required flag %q in %v", flag, argsNo)
+		}
+	}
+	if got := stripChaptersValue(argsNo); got != "-1" {
+		t.Errorf("-map_chapters value = %q, want -1: %v", got, argsNo)
+	}
+
+	// faststart only for MP4-family.
+	if !has(argsOver, "+faststart") {
+		t.Errorf("expected +faststart for .mp4: %v", argsOver)
+	}
+	mkvArgs := BuildStripArgs("in.mp4", "out.mkv", ".mkv", false)
+	if has(mkvArgs, "+faststart") {
+		t.Errorf("+faststart must NOT be added for .mkv: %v", mkvArgs)
+	}
+	if !has(BuildStripArgs("in", "out.MP4", ".MP4", false), "+faststart") {
+		t.Error("expected +faststart for .MP4 (case-insensitive)")
+	}
+}
+
+// stripChaptersValue returns the value paired with "-map_chapters" in args,
+// used by TestBuildStripArgs to pin the -1 requirement.
+func stripChaptersValue(args []string) string {
+	for i, a := range args {
+		if a == "-map_chapters" && i+1 < len(args) {
+			return args[i+1]
+		}
+	}
+	return ""
+}
+
+func TestVerifyNoChaptersPure(t *testing.T) {
+	if err := CompareNoChapters(0); err != nil {
+		t.Errorf("expected count 0 to pass, got %v", err)
+	}
+	for _, n := range []int{1, 3} {
+		err := CompareNoChapters(n)
+		if err == nil {
+			t.Errorf("expected count %d to fail", n)
+			continue
+		}
+		if !strings.Contains(err.Error(), "expected 0 chapters") {
+			t.Errorf("unexpected error wording: %v", err)
+		}
+	}
+}
+
+func TestCountChaptersInvalidFile(t *testing.T) {
+	if _, err := CountChapters("/nonexistent/file.mp4"); err == nil {
+		t.Error("expected error counting chapters of a nonexistent file")
+	}
+}
+
 func TestRemuxProcessInterrupt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses Unix 'sleep' command")

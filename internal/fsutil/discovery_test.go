@@ -272,6 +272,176 @@ func TestFindCandidatesMissingDir(t *testing.T) {
 	}
 }
 
+func TestFindMediaFilesShallow(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "a.mp4"))
+	writeFile(t, filepath.Join(dir, "a.txt"))
+	writeFile(t, filepath.Join(dir, "b.mkv"))
+	writeFile(t, filepath.Join(dir, "b.txt"))
+	// Media in a subdirectory must be ignored in shallow mode.
+	sub := filepath.Join(dir, "sub")
+	if err := os.Mkdir(sub, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(sub, "nested.mp4"))
+	// Non-media files and sidecars alone must be ignored.
+	writeFile(t, filepath.Join(dir, "notes.txt"))
+	writeFile(t, filepath.Join(dir, "notes.pdf"))
+	// Unsupported extension must be ignored even without a sidecar.
+	writeFile(t, filepath.Join(dir, "old.avi"))
+
+	files, err := FindMediaFiles(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("got %d media files, want 2: %+v", len(files), files)
+	}
+	want := []string{filepath.Join(dir, "a.mp4"), filepath.Join(dir, "b.mkv")}
+	for i, f := range files {
+		if f != want[i] {
+			t.Errorf("media[%d] = %s, want %s", i, f, want[i])
+		}
+	}
+}
+
+func TestFindMediaFilesRecursive(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "top.mp4"))
+	nested := filepath.Join(dir, "nested")
+	if err := os.Mkdir(nested, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(nested, "deep.mov"))
+	deep := filepath.Join(nested, "deeper")
+	if err := os.Mkdir(deep, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(deep, "deepest.m4a"))
+	// Sidecar-like files and unsupported extensions never count, recursive or not.
+	writeFile(t, filepath.Join(nested, "notes.txt"))
+
+	files, err := FindMediaFiles(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 3 {
+		t.Fatalf("got %d media files, want 3: %+v", len(files), files)
+	}
+	want := []string{
+		filepath.Join(nested, "deep.mov"),
+		filepath.Join(deep, "deepest.m4a"),
+		filepath.Join(dir, "top.mp4"),
+	}
+	for i, f := range files {
+		if f != want[i] {
+			t.Errorf("media[%d] = %s, want %s", i, f, want[i])
+		}
+	}
+}
+
+func TestFindMediaFilesGeneratedExclusion(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "vid-chapters.mp4"))
+	writeFile(t, filepath.Join(dir, "vid-nochapters.mkv"))
+	writeFile(t, filepath.Join(dir, "lecture.01-chapters.m4v"))
+	// A normal file must survive.
+	writeFile(t, filepath.Join(dir, "keep.mp4"))
+
+	files, err := FindMediaFiles(dir, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0] != filepath.Join(dir, "keep.mp4") {
+		t.Fatalf("got %+v, want only keep.mp4", files)
+	}
+}
+
+func TestFindMediaFilesUnsupportedExtensions(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "old.avi"))
+	writeFile(t, filepath.Join(dir, "flash.flv"))
+	writeFile(t, filepath.Join(dir, "audio.wav"))
+	writeFile(t, filepath.Join(dir, "https.mp4"))
+
+	files, err := FindMediaFiles(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 1 || files[0] != filepath.Join(dir, "https.mp4") {
+		t.Fatalf("got %+v, want only https.mp4", files)
+	}
+}
+
+func TestFindMediaFilesUnicodeAndSpaces(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "فيديو تجريبي.mkv"))
+	writeFile(t, filepath.Join(dir, "دورة قواعد.mp4"))
+
+	files, err := FindMediaFiles(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 2 {
+		t.Fatalf("got %d media files, want 2: %+v", len(files), files)
+	}
+	if files[0] != filepath.Join(dir, "دورة قواعد.mp4") ||
+		files[1] != filepath.Join(dir, "فيديو تجريبي.mkv") {
+		t.Errorf("unexpected ordering: %+v", files)
+	}
+}
+
+func TestFindMediaFilesDeterministicOrdering(t *testing.T) {
+	dir := t.TempDir()
+	names := []string{"z.mp4", "a.mp4", "m.mkv", "b.mp4"}
+	for _, n := range names {
+		writeFile(t, filepath.Join(dir, n))
+	}
+
+	run := func() []string {
+		files, err := FindMediaFiles(dir, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return files
+	}
+
+	first := run()
+	want := []string{"a.mp4", "b.mp4", "m.mkv", "z.mp4"}
+	for i, f := range first {
+		if filepath.Base(f) != want[i] {
+			t.Errorf("media[%d] = %s, want %s", i, filepath.Base(f), want[i])
+		}
+	}
+	second := run()
+	for i := range first {
+		if first[i] != second[i] {
+			t.Fatalf("unstable ordering across runs: %+v vs %+v", first, second)
+		}
+	}
+}
+
+func TestFindMediaFilesMissingDir(t *testing.T) {
+	if _, err := FindMediaFiles(filepath.Join(t.TempDir(), "absent"), false); err == nil {
+		t.Error("expected an error for a missing directory")
+	}
+}
+
+func TestFindMediaFilesDirectoryIsNotCandidate(t *testing.T) {
+	dir := t.TempDir()
+	// A directory with a media-like name must not be returned.
+	if err := os.Mkdir(filepath.Join(dir, "video.mp4"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	files, err := FindMediaFiles(dir, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(files) != 0 {
+		t.Fatalf("media-named directory must not be a candidate, got %+v", files)
+	}
+}
+
 func TestFindCandidatesSymlinkMedia(t *testing.T) {
 	dir := t.TempDir()
 	real := filepath.Join(dir, "real.mp4")

@@ -53,6 +53,26 @@ func DefaultOutputPath(inputPath string) string {
 	return filepath.Join(dir, newname)
 }
 
+// DefaultNoChaptersOutputPath derives the default output path for the rmch
+// command from the input media path. It mirrors DefaultOutputPath exactly but
+// inserts "-nochapters" before the extension:
+//
+//	My Course.mp4  ->  My Course-nochapters.mp4
+//	video.mkv      ->  video-nochapters.mkv
+//	lecture.01.mp4 ->  lecture.01-nochapters.mp4
+//
+// Files whose name has no extension (e.g. "VIDEO") get "-nochapters" appended.
+// The path is normalized with filepath.Clean. The addch counterpart
+// (DefaultOutputPath) keeps the existing "-chapters" suffix.
+func DefaultNoChaptersOutputPath(inputPath string) string {
+	dir := filepath.Dir(inputPath)
+	base := filepath.Base(inputPath)
+	ext := filepath.Ext(base)
+	stem := strings.TrimSuffix(base, ext)
+	newname := stem + "-nochapters" + ext
+	return filepath.Join(dir, newname)
+}
+
 // OutputExtension returns the lowercase extension (including the dot) of a path,
 // or "" if the path has no extension.
 func OutputExtension(p string) string {

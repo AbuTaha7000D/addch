@@ -133,6 +133,35 @@ func TestDefaultOutputPathWindowsAbs(t *testing.T) {
 	}
 }
 
+func TestDefaultNoChaptersOutputPath(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"My Course.mp4", "My Course-nochapters.mp4"},
+		{"video.mkv", "video-nochapters.mkv"},
+		{"lecture.01.mp4", "lecture.01-nochapters.mp4"},
+		{filepath.Join("path", "to", "My Course.mp4"), filepath.Join("path", "to", "My Course-nochapters.mp4")},
+		{filepath.Join("a", "b", "video.mkv"), filepath.Join("a", "b", "video-nochapters.mkv")},
+		{"فيديو.mkv", "فيديو-nochapters.mkv"},
+		{"VIDEO", "VIDEO-nochapters"},
+		{".hidden.mp4", ".hidden-nochapters.mp4"},
+		{"tool.exe", "tool-nochapters.exe"}, // .exe handled like any other extension
+	}
+	for _, c := range cases {
+		if got := DefaultNoChaptersOutputPath(c.in); got != c.want {
+			t.Errorf("DefaultNoChaptersOutputPath(%q) = %q, want %q", c.in, got, c.want)
+		}
+	}
+}
+
+func TestDefaultNoChaptersOutputPathUnicodeDir(t *testing.T) {
+	in := filepath.Join("My Course", "فيديو", "lecture.01.mp4")
+	want := filepath.Join("My Course", "فيديو", "lecture.01-nochapters.mp4")
+	if got := DefaultNoChaptersOutputPath(in); got != want {
+		t.Errorf("DefaultNoChaptersOutputPath(%q) = %q, want %q", in, got, want)
+	}
+}
+
 func TestOutputExtension(t *testing.T) {
 	cases := []struct {
 		in, want string

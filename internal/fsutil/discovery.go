@@ -97,50 +97,67 @@ func addCandidate(candidates []Candidate, media string, sidecar string) []Candid
 // excluded, and the returned slice is sorted lexicographically by MediaPath so
 // execution order is deterministic across platforms.
 func FindCandidates(dir string, recursive bool) ([]Candidate, error) {
-	if recursive {
-		return findCandidatesRecursive(dir)
-	}
-	return findCandidatesShallow(dir)
-}
-
-func findCandidatesShallow(dir string) ([]Candidate, error) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
+	var paths []string
+	if err := walkMediaFiles(dir, recursive, func(p string) { paths = append(paths, p) }); err != nil {
 		return nil, err
 	}
 	var candidates []Candidate
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		media := filepath.Join(dir, entry.Name())
-		if !candidateMedia(media) {
-			continue
-		}
+	for _, media := range paths {
 		candidates = addCandidate(candidates, media, SidecarPath(media))
 	}
 	return sortCandidates(candidates), nil
 }
 
-func findCandidatesRecursive(dir string) ([]Candidate, error) {
-	var candidates []Candidate
-	err := filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if !candidateMedia(path) {
-			return nil
-		}
-		candidates = addCandidate(candidates, path, SidecarPath(path))
-		return nil
-	})
-	if err != nil {
+// FindMediaFiles discovers supported-media, non-generated, regular files under
+// dir WITHOUT requiring a sidecar, sorted lexicographically. Shallow vs
+// recursive behavior is identical to FindCandidates: when recursive is false
+// only the files directly inside dir are inspected, when true the whole tree is
+// walked, subdirectories are never candidates, and generated outputs (filenames
+// ending in "-chapters" or "-nochapters") are unconditionally excluded. This is
+// the discovery entry point for rmch, which has no sidecar concept.
+func FindMediaFiles(dir string, recursive bool) ([]string, error) {
+	var out []string
+	if err := walkMediaFiles(dir, recursive, func(p string) { out = append(out, p) }); err != nil {
 		return nil, err
 	}
-	return sortCandidates(candidates), nil
+	sort.Strings(out)
+	return out, nil
+}
+
+// walkMediaFiles visits every media candidate under dir — a regular file with a
+// supported extension that is not a generated output — shallow or recursive,
+// calling visit for each. Subdirectories are skipped in both modes. The shared
+// traversal is what keeps the two discovery flavors' ordering and filtering
+// identical.
+func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
+	if recursive {
+		return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
+			if d.IsDir() {
+				return nil
+			}
+			if candidateMedia(path) {
+				visit(path)
+			}
+			return nil
+		})
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		path := filepath.Join(dir, entry.Name())
+		if candidateMedia(path) {
+			visit(path)
+		}
+	}
+	return nil
 }
 
 // candidateMedia reports whether path is a regular file eligible for discovery:

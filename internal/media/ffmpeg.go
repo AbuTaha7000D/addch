@@ -105,6 +105,32 @@ func BuildFFmpegArgs(inputVideo, inputMeta, output string, outputExt string, ove
 	return args
 }
 
+// BuildStripArgs returns the argument vector for the FFmpeg chapter-stripping
+// command (rmch). It copies all streams (stream copy, no re-encode), preserves
+// metadata, and explicitly disables chapter copying with -map_chapters -1 (the
+// empirically verified requirement: without it, FFmpeg copies the source
+// chapters into the output, so the output would keep its chapters). overwrite
+// controls whether FFmpeg is allowed to replace the output without prompting
+// (-y). +faststart is only added for MP4-family containers.
+func BuildStripArgs(inputVideo, output string, outputExt string, overwrite bool) []string {
+	args := []string{"-hide_banner", "-loglevel", "error"}
+	if overwrite {
+		args = append(args, "-y")
+	}
+	args = append(args,
+		"-i", inputVideo,
+		"-map", "0",
+		"-map_metadata", "0",
+		"-map_chapters", "-1",
+		"-c", "copy",
+	)
+	if IsMP4Family(outputExt) {
+		args = append(args, "-movflags", "+faststart")
+	}
+	args = append(args, output)
+	return args
+}
+
 // RemuxProcess controls a running FFmpeg remux process. It wraps the child so the
 // caller can both wait for normal completion and interrupt (kill + wait) the
 // child, which is required for correct signal handling.
@@ -134,6 +160,17 @@ func NewRemuxProcess(cmd *exec.Cmd) *RemuxProcess {
 // obtain its final error, or Interrupt() to terminate and reap the child.
 func StartRemux(inputVideo, inputMeta, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
 	cmd := exec.Command("ffmpeg", BuildFFmpegArgs(inputVideo, inputMeta, output, outputExt, overwrite)...)
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
+	}
+	return NewRemuxProcess(cmd), nil
+}
+
+// StartStrip builds and starts the FFmpeg chapter-stripping command (rmch).
+// Unlike StartRemux it has no metadata input; it strips via -map_chapters -1.
+// Call Wait()/Done() for the final error, or Interrupt() to kill and reap.
+func StartStrip(inputVideo, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
+	cmd := exec.Command("ffmpeg", BuildStripArgs(inputVideo, output, outputExt, overwrite)...)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
 	}
