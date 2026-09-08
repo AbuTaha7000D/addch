@@ -23,12 +23,13 @@ Usage:
   getch [options] <media-file>
 
 Extract chapter markers from <media-file> using FFprobe. The media file is
-never modified. Chapters are printed to stdout, one "HH:MM:SS[.mmm] Title" line
-per chapter, in the order FFprobe reports them. Diagnostics and errors are
-written to stderr. A file with no chapters produces empty stdout and exits 0.
+never modified. Chapters are written to stdout (or to a file with -o), one
+"HH:MM:SS[.mmm] Title" line per chapter, in the order FFprobe reports them.
+A file with no chapters produces empty stdout and exits 0. Diagnostics and
+per-item batch reports go to stderr; stdout carries only chapter data.
 
 Options:
-  -o, --output <file>  Write the chapters to <file> (atomic) instead of stdout
+  -o, --output <file>  Custom output path, written atomically (default: stdout)
       --overwrite      Replace the output file if it already exists
       --dir            Batch mode: extract chapters for each media file directly inside a directory
       --recursive      Batch mode: extract chapters for a directory and all nested subdirectories
@@ -38,8 +39,7 @@ Options:
 
 In batch mode each media file's chapters are written next to it as
 "<name>.txt" (the addch sidecar), except when the file has no chapters or a
-sidecar already exists. Per-item results and totals are reported on stderr;
-stdout stays empty.
+sidecar already exists.
 
 Examples:
   getch "My Course.mp4"
@@ -65,7 +65,10 @@ type parsedArgs struct {
 // flagged via the returned struct fields.
 func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	fs := flag.NewFlagSet("getch", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	// The flag package prints the raw parse error ("flag provided but not
+	// defined: ...") itself on ContinueOnError; discard that so run()'s single
+	// "Error: ..." line is the only stderr line for an unknown flag.
+	fs.SetOutput(io.Discard)
 	// Help text is written to stdout by the success paths below; the flag
 	// package's default Usage (used for -h and unknown flags) also invokes this,
 	// so make it a no-op here to avoid duplicate output.

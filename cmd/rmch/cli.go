@@ -17,7 +17,8 @@ Usage:
   rmch [options] <video-file>
 
 Remove all chapter markers from <video-file> using FFmpeg stream copy
-(no re-encoding). The original video is never modified.
+(no re-encoding) and write the result to a new -nochapters file. The
+original video is never modified.
 
 Options:
   -o, --output <file>  Custom output path (default: <video>-nochapters.<ext>)
@@ -30,6 +31,7 @@ Options:
 
 Examples:
   rmch "My Course.mp4"
+  rmch -o "My Course-clean.mp4" "My Course.mp4"
   rmch --dir ./videos
   rmch --recursive ./videos
 `
@@ -51,7 +53,10 @@ type parsedArgs struct {
 // flagged via the returned struct fields.
 func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	fs := flag.NewFlagSet("rmch", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	// The flag package prints the raw parse error ("flag provided but not
+	// defined: ...") itself on ContinueOnError; discard that so run()'s single
+	// "Error: ..." line is the only stderr line for an unknown flag.
+	fs.SetOutput(io.Discard)
 	// Help text is written to stdout by the success paths below; the flag
 	// package's default Usage (used for -h and unknown flags) also invokes this,
 	// so make it a no-op here to avoid duplicate output.

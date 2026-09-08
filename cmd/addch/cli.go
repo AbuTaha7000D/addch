@@ -20,7 +20,8 @@ Usage:
   addch [options] <chapters-file> <video-file>
 
 Embed chapters defined in <chapters-file> into <video-file> using FFmpeg
-stream copy (no re-encoding). The original video is never modified.
+stream copy (no re-encoding). The original video is never modified; the
+chaptered output is written as a new file next to it.
 
 Arguments:
   chapters-file    Path to a text file with one chapter per line:
@@ -39,6 +40,7 @@ Options:
 
 Examples:
   addch chapters.txt "My Course.mp4"
+  addch -o "My Course-custom.mp4" chapters.txt "My Course.mp4"
   addch --dir ./videos
   addch --recursive ./videos
   addch --example
@@ -63,7 +65,10 @@ type parsedArgs struct {
 // and are flagged via the returned struct fields.
 func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	fs := flag.NewFlagSet("addch", flag.ContinueOnError)
-	fs.SetOutput(stderr)
+	// The flag package prints the raw parse error ("flag provided but not
+	// defined: ...") itself on ContinueOnError; discard that so run()'s single
+	// "Error: ..." line is the only stderr line for an unknown flag.
+	fs.SetOutput(io.Discard)
 	// Help text is written to stdout by the success paths below; the flag
 	// package's default Usage (used for -h and unknown flags) also invokes this,
 	// so make it a no-op here to avoid duplicate output.
