@@ -93,3 +93,96 @@ func TestParseArgsSingleDashShortOutput(t *testing.T) {
 		t.Errorf("output = %q, want out.mkv", pa.output)
 	}
 }
+
+func TestParseArgsDirAndRecursiveMutuallyExclusive(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	_, err := parseArgs([]string{"--dir", "--recursive"}, &out, &errBuf)
+	if err == nil {
+		t.Fatal("expected error for --dir and --recursive together")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsDirWithOutput(t *testing.T) {
+	for _, args := range [][]string{{"--dir", "--output", "out.mp4"}, {"--dir", "-o", "out.mp4"}} {
+		var out, errBuf bytes.Buffer
+		_, err := parseArgs(args, &out, &errBuf)
+		if err == nil {
+			t.Errorf("parseArgs(%v): expected error for --dir with --output", args)
+			continue
+		}
+		if !strings.Contains(err.Error(), "--output cannot be combined with") {
+			t.Errorf("parseArgs(%v): unexpected error: %v", args, err)
+		}
+	}
+}
+
+func TestParseArgsRecursiveWithOutput(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	_, err := parseArgs([]string{"--recursive", "--output", "out.mp4"}, &out, &errBuf)
+	if err == nil {
+		t.Fatal("expected error for --recursive with --output")
+	}
+	if !strings.Contains(err.Error(), "--output cannot be combined with") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestParseArgsBatchModeWithPositionalArgs(t *testing.T) {
+	for _, args := range [][]string{
+		{"--dir", "ch.txt"},
+		{"--dir", "ch.txt", "vid.mp4"},
+		{"--recursive", "ch.txt", "vid.mp4"},
+	} {
+		var out, errBuf bytes.Buffer
+		_, err := parseArgs(args, &out, &errBuf)
+		if err == nil {
+			t.Errorf("parseArgs(%v): expected error for batch mode with positional args", args)
+			continue
+		}
+		if !strings.Contains(err.Error(), "takes no positional arguments") {
+			t.Errorf("parseArgs(%v): unexpected error: %v", args, err)
+		}
+	}
+}
+
+func TestParseArgsDir(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	pa, err := parseArgs([]string{"--dir"}, &out, &errBuf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pa.dir || pa.recursive {
+		t.Errorf("expected dir=true, recursive=false, got %+v", pa)
+	}
+	if pa.chapters != "" || pa.video != "" {
+		t.Errorf("expected empty chapters/video in batch mode, got %+v", pa)
+	}
+}
+
+func TestParseArgsRecursive(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	pa, err := parseArgs([]string{"--recursive"}, &out, &errBuf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !pa.recursive || pa.dir {
+		t.Errorf("expected recursive=true, dir=false, got %+v", pa)
+	}
+}
+
+func TestParseArgsSingleFileSuccess(t *testing.T) {
+	var out, errBuf bytes.Buffer
+	pa, err := parseArgs([]string{"chapters.txt", "video.mp4"}, &out, &errBuf)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if pa.chapters != "chapters.txt" || pa.video != "video.mp4" {
+		t.Errorf("chapters/video mismatch: %+v", pa)
+	}
+	if pa.dir || pa.recursive {
+		t.Errorf("expected both batch flags false, got %+v", pa)
+	}
+}

@@ -30,6 +30,8 @@ Arguments:
 Options:
   -o, --output <file>  Custom output path (default: <video>-chapters.<ext>)
       --overwrite      Overwrite the output file if it already exists
+      --dir            Batch mode: process the media files directly inside a directory
+      --recursive      Batch mode: process a directory and all nested subdirectories
       --example        Write example_chapters.txt and exit
       --check          Verify ffmpeg/ffprobe availability and exit
       --version        Print version and exit
@@ -37,6 +39,8 @@ Options:
 
 Examples:
   addch chapters.txt "My Course.mp4"
+  addch --dir ./videos
+  addch --recursive ./videos
   addch --example
 `
 
@@ -46,6 +50,8 @@ type parsedArgs struct {
 	version   bool
 	help      bool
 	overwrite bool
+	dir       bool
+	recursive bool
 	output    string
 	chapters  string
 	video     string
@@ -67,6 +73,8 @@ func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	versionFlag := fs.Bool("version", false, "")
 	help := fs.Bool("help", false, "")
 	overwrite := fs.Bool("overwrite", false, "")
+	dir := fs.Bool("dir", false, "")
+	recursive := fs.Bool("recursive", false, "")
 	output := fs.String("output", "", "")
 	fs.StringVar(output, "o", "", "")
 
@@ -87,6 +95,8 @@ func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 		version:   *versionFlag,
 		help:      *help,
 		overwrite: *overwrite,
+		dir:       *dir,
+		recursive: *recursive,
 		output:    *output,
 	}
 
@@ -103,6 +113,21 @@ func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	}
 
 	rest := fs.Args()
+
+	// Batch-mode validation. These rules run before the single-file positional
+	// argument logic and only apply when a batch flag was given.
+	switch {
+	case pa.dir && pa.recursive:
+		return nil, fmt.Errorf("--dir and --recursive are mutually exclusive; use exactly one.")
+	case (pa.dir || pa.recursive) && pa.output != "":
+		return nil, fmt.Errorf("--output cannot be combined with --dir/--recursive batch mode.")
+	case pa.dir || pa.recursive:
+		if len(rest) != 0 {
+			return nil, fmt.Errorf("batch mode takes no positional arguments (got %d): %v", len(rest), rest)
+		}
+		return pa, nil
+	}
+
 	if len(rest) < 2 {
 		fmt.Fprint(stderr, usageText)
 		return nil, fmt.Errorf("missing required arguments: <chapters-file> and <video-file>")
