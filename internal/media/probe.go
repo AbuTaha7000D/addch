@@ -234,6 +234,43 @@ func diff(a, b int64) int64 {
 	return b - a
 }
 
+// ProbeChapters extracts the chapter markers of a media file exactly as ffprobe
+// reports them (in probe order, converted to milliseconds). It returns an empty
+// slice for a file with no chapters. Unlike CountChapters, which only cares how
+// many there are, this is the faithful getch analogue: chapters are picked up
+// verbatim with no normalization, validation, reordering, zero-first insertion,
+// or title truncation.
+func ProbeChapters(path string) ([]chapters.Chapter, error) {
+	out, err := ProbeJSON("-show_chapters", path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read chapters for %q: %v", path, err)
+	}
+	var pc probeChapters
+	if err := json.Unmarshal(out, &pc); err != nil {
+		return nil, fmt.Errorf("could not parse ffprobe chapter output for %q: %v", path, err)
+	}
+	return ChaptersFromProbe(pc.Chapters)
+}
+
+// ChaptersFromProbe converts ffprobe chapter entries into the toolkit's chapter
+// model, preserving probe order and each chapter's verbatim title. Only the
+// start time (converted from the container's own time_base) and title are
+// carried over; the end time is deliberately dropped because a faithful extract
+// reproduces chapters from their start markers alone. A chapter whose start
+// cannot be interpreted (unparseable time_base) is an error: a probe result
+// that cannot be turned into milliseconds must fail loudly rather than guess.
+func ChaptersFromProbe(chs []ProbeChapter) ([]chapters.Chapter, error) {
+	out := make([]chapters.Chapter, 0, len(chs))
+	for _, c := range chs {
+		start, ok := TimebaseToMillis(c.Start, c.TimeBase)
+		if !ok {
+			return nil, fmt.Errorf("could not interpret time_base %q at start %d", c.TimeBase, c.Start)
+		}
+		out = append(out, chapters.Chapter{Start: start, Title: c.Tags.Title})
+	}
+	return out, nil
+}
+
 // CountChapters returns the number of chapter markers in a media file as
 // reported by ffprobe -show_chapters. This is the chapter-stripping (rmch)
 // analogue of the embed-side probe; it is also used up front to decide whether

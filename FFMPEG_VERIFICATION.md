@@ -190,3 +190,54 @@ are out of contract per `GRAMMAR.md` §10.3.
 - No `rmch` validation exists yet.
 - These results do not expand the supported-container matrix beyond the
   empirically tested cases; untested containers remain unverified.
+
+## Phase 6 — getch extraction verification
+
+`getch` runs FFprobe only (`-show_chapters`) and never spawns FFmpeg. Its
+faithfulness contract is verified in `cmd/getch/integration_test.go`,
+`cmd/getch/batch_test.go`, and `cmd/getch/exitgate_test.go`, against real
+FFprobe on top of real FFmpeg-built fixtures.
+
+Round-trip proofs (real Fixtures, real FFprobe):
+
+- `TestExtractMP4` / `TestExtractMKV` (R1 + R4): a fixture embedded through the
+  production addch core yields stdout exactly equal to the canonical TXT form,
+  and `Parse(extracted) == Parse(original)`.
+- `TestExtractRoundTripFullChain` (R2): `txt1 → addch → v1 → getch → txt2 →
+  addch → v2 → getch → txt3` closes, with `txt3 == canonical(Parse(txt2))`, for
+  both MP4 and MKV.
+- `TestExtractZeroChapters`: a chapterless media file exits 0 with empty stdout
+  and, in `-o` mode, writes nothing.
+- `TestExtractOutputFile` / `TestExtractOutputFailureCleansUp` /
+  `TestExtractOutputRefusalAndOverwrite` / `TestExtractOutputSamePath`:
+  `--output` writes the canonical TXT atomically with no `.addch-sidecar-*`
+  litter, refuses to overwrite unless `--overwrite`, never touches the input,
+  and guards the same-path case.
+- `TestExtractForeignChaptersMKV`: a foreign MKV whose chapters the Matroska
+  muxer preserves verbatim (first chapter at `00:00:01`, an empty title, exact
+  starts) is emitted exactly — no zero-first insertion, no title fill, no
+  dedup, no truncation. The faithful empty-title line keeps FFprobe's exact
+  title; because it is verbatim, it is deliberately not re-embeddable.
+
+Batch and interruption proofs:
+
+- `TestRunBatchMixedDirectory`, `TestRunBatchShallowVsRecursive`,
+  `TestRunBatchOverwriteRegenerates`, `TestRunBatchEmptyDirectory`: discovery,
+  deterministic order, generated-output exclusion, per-item skip reasons, and
+  atomic sidecar creation — with stdout empty and all reports on stderr.
+- `TestBatchSIGINTExit130` / `TestBatchSIGTERMExit143`: the real binary,
+  interrupted mid-batch over 30 candidates, exits 130/143 with no partial or
+  empty sidecars and no temp litter.
+
+### Foreign-chapter behavior observed (FFmpeg 8.1.2)
+
+- The MP4 muxer normalizes foreign chapter sets: it forces a zero-start first
+  chapter (reusing the first listed chapter's title) and bumps a duplicate
+  start forward, so MP4 cannot carry a foreign layout faithfully.
+- The MKV muxer requires strictly ascending, non-overlapping starts and drops
+  out-of-order or duplicate-start chapters, but preserves a first chapter at a
+  non-zero start, an empty title, and exact starts in-order — so MKV is the
+  foreign-chapter fixture carrier.
+- A chapter's stored `time_base` must always be converted (`MKV` uses
+  `1/1000000000` even when the `FFMETADATA` declared `1/1000`); getch reuse of
+  `TimebaseToMillis` continues the existing invariant.

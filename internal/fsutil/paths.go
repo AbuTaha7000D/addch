@@ -87,3 +87,42 @@ func CleanupFile(path string) {
 		_ = err
 	}
 }
+
+// WriteFileAtomic writes data to path atomically: the content is first written
+// to a uniquely named temporary file created inside path's directory, then
+// renamed over path. Rename within the same directory is atomic, so readers
+// never observe a partially written file and an existing file is either fully
+// replaced or left untouched. The temporary file starts with os.CreateTemp's
+// exclusive 0600 mode and is chmod'ed to 0644 before the rename so the result
+// is a readable text file on disk; it is removed if any step before the rename
+// fails. A missing parent directory makes os.CreateTemp fail, so nothing is
+// written (a getch sidecar never creates the directory it targets).
+func WriteFileAtomic(path string, data []byte) error {
+	dir := filepath.Dir(path)
+	tmp, err := os.CreateTemp(dir, ".addch-sidecar-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	defer func() {
+		if tmpName != "" {
+			_ = os.Remove(tmpName)
+		}
+	}()
+	if err := os.Chmod(tmpName, 0o644); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if _, err := tmp.Write(data); err != nil {
+		_ = tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Rename(tmpName, path); err != nil {
+		return err
+	}
+	tmpName = "" // renamed into place; the deferred removal has nothing to do
+	return nil
+}

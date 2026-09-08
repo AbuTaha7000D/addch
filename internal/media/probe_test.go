@@ -91,6 +91,102 @@ func TestGetVideoDurationInvalidFile(t *testing.T) {
 	}
 }
 
+// TestChaptersFromProbe covers the pure probe-to-model conversion used by getch
+// (and ProbeChapters): faithful ms conversion, verbatim titles, probe order, an
+// empty-result empty slice, and a hard error on an unparseable time_base.
+func TestChaptersFromProbe(t *testing.T) {
+	probe := func(start int64, tb, title string) ProbeChapter {
+		p := ProbeChapter{ID: 1, TimeBase: tb, Start: start}
+		p.Tags.Title = title
+		return p
+	}
+
+	t.Run("converts ms and everything is carried faithfully", func(t *testing.T) {
+		in := []ProbeChapter{
+			probe(0, "1/1000", "Intro"),
+			probe(3000, "1/1000", "Middle"),
+		}
+		got, err := ChaptersFromProbe(in)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := []chapters.Chapter{{Start: 0, Title: "Intro"}, {Start: 3000, Title: "Middle"}}
+		if len(got) != len(want) {
+			t.Fatalf("got %d chapters, want %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i].Start != want[i].Start || got[i].Title != want[i].Title {
+				t.Errorf("chapter %d = %+v, want %+v", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("ns time_base is converted to ms", func(t *testing.T) {
+		got, err := ChaptersFromProbe([]ProbeChapter{probe(60500000000, "1/1000000000", "Late")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got[0].Start != 60500 {
+			t.Errorf("Start = %d, want 60500", got[0].Start)
+		}
+	})
+
+	t.Run("order is preserved verbatim, no zero-first or dedup", func(t *testing.T) {
+		in := []ProbeChapter{
+			probe(5000, "1/1000", "Late"),
+			probe(1000, "1/1000", "Early"),
+			probe(1000, "1/1000", "DupStart"),
+			probe(3000, "1/1000", ""),
+		}
+		got, err := ChaptersFromProbe(in)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		want := []chapters.Chapter{
+			{Start: 5000, Title: "Late"},
+			{Start: 1000, Title: "Early"},
+			{Start: 1000, Title: "DupStart"},
+			{Start: 3000, Title: ""},
+		}
+		if len(got) != len(want) {
+			t.Fatalf("got %d chapters, want %d", len(got), len(want))
+		}
+		for i := range want {
+			if got[i].Start != want[i].Start || got[i].Title != want[i].Title {
+				t.Errorf("chapter %d = %+v, want %+v", i, got[i], want[i])
+			}
+		}
+	})
+
+	t.Run("empty probe result yields an empty non-nil slice", func(t *testing.T) {
+		got, err := ChaptersFromProbe(nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got == nil || len(got) != 0 {
+			t.Errorf("got %#v, want an empty non-nil slice", got)
+		}
+	})
+
+	t.Run("unparseable time_base is an error", func(t *testing.T) {
+		_, err := ChaptersFromProbe([]ProbeChapter{probe(5, "garbage", "Bad")})
+		if err == nil {
+			t.Fatal("expected error for unparseable time_base")
+		}
+		if _, ok := TimebaseToMillis(5, "garbage"); ok {
+			t.Fatal("sanity: TimebaseToMillis should reject garbage")
+		}
+	})
+}
+
+// TestProbeChaptersNonexistent verifies that the ffprobe-backed extractor fails
+// on a path that cannot be read (the same contract as GetVideoDurationMs).
+func TestProbeChaptersNonexistent(t *testing.T) {
+	if _, err := ProbeChapters("/nonexistent/file.mp4"); err == nil {
+		t.Error("expected error for nonexistent video file")
+	}
+}
+
 func TestCompareChapters(t *testing.T) {
 	expected := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},

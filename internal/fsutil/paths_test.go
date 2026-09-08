@@ -203,3 +203,78 @@ func TestCleanupFile(t *testing.T) {
 		}
 	})
 }
+
+// sidecarTempLitter returns the number of WriteFileAtomic temp files left in dir.
+func sidecarTempLitter(dir string) int {
+	matches, _ := filepath.Glob(filepath.Join(dir, ".addch-sidecar-*"))
+	return len(matches)
+}
+
+func TestWriteFileAtomic(t *testing.T) {
+	const content = "00:00:00 Intro\n00:00:03 Middle\n"
+
+	t.Run("writes the content", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "out.txt")
+		if err := WriteFileAtomic(target, []byte(content)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got, err := os.ReadFile(target)
+		if err != nil {
+			t.Fatalf("read back: %v", err)
+		}
+		if string(got) != content {
+			t.Errorf("content = %q, want %q", got, content)
+		}
+		if sidecarTempLitter(dir) != 0 {
+			t.Errorf("temp files leaked: %d", sidecarTempLitter(dir))
+		}
+	})
+
+	t.Run("atomically replaces an existing file", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "out.txt")
+		if err := os.WriteFile(target, []byte("stale"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := WriteFileAtomic(target, []byte(content)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		got, _ := os.ReadFile(target)
+		if string(got) != content {
+			t.Errorf("content = %q, want %q", got, content)
+		}
+		if sidecarTempLitter(dir) != 0 {
+			t.Errorf("temp files leaked: %d", sidecarTempLitter(dir))
+		}
+	})
+
+	t.Run("result is a readable 0644 file", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "out.txt")
+		if err := WriteFileAtomic(target, []byte(content)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		fi, err := os.Stat(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if perm := fi.Mode().Perm(); perm&0o777 != 0o644 {
+			t.Errorf("mode = %o, want 644", perm)
+		}
+	})
+
+	t.Run("missing parent directory fails without leaving temp files", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "absent", "out.txt")
+		if err := WriteFileAtomic(target, []byte(content)); err == nil {
+			t.Fatal("expected error for missing parent directory")
+		}
+		if sidecarTempLitter(filepath.Join(dir, "absent")) != 0 {
+			t.Errorf("temp files leaked in absent dir: %d", sidecarTempLitter(filepath.Join(dir, "absent")))
+		}
+		if _, err := os.Stat(target); !os.IsNotExist(err) {
+			t.Errorf("target must not exist: %v", err)
+		}
+	})
+}
