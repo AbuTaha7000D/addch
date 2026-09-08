@@ -66,9 +66,10 @@ end of every approved task so the next task is always explicit.
 
 ## Phase 3 — Shared core refactor
 
-- [ ] Create `internal/chapters` for parsing, validation, and serialization.
+- [x] Create `internal/chapters` for parsing, validation, and serialization.
+  (Committed in `221b68e`.)
 - [ ] Create `internal/media` for FFmpeg/FFprobe, remuxing, and verification.
-- [x] Create `internal/fsutil` for paths, matching, and discovery.
+- [x] Create `internal/fsutil` for paths, matching, and discovery. (Committed in `5222d1a`.)
 - [ ] Create `internal/batch` for orchestration and result reporting.
 - [ ] Move the add command entry point to `cmd/addch/main.go`.
 - [ ] Preserve v0.1 behavior and keep all existing tests passing.

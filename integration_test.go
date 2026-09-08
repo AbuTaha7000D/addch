@@ -11,6 +11,7 @@ import (
 
 	"github.com/abutaha/addch/internal/chapters"
 	"github.com/abutaha/addch/internal/fsutil"
+	"github.com/abutaha/addch/internal/media"
 )
 
 // requireTools skips integration tests if ffmpeg/ffprobe are unavailable.
@@ -84,14 +85,14 @@ func TestEndToEnd(t *testing.T) {
 	// differ). Convert to milliseconds via time_base so these assertions are
 	// platform-independent. This mirrors the production verification in compareChapters.
 	start := func(i int) int64 {
-		ms, ok := timebaseToMillis(chapters[i].Start, chapters[i].TimeBase)
+		ms, ok := media.TimebaseToMillis(chapters[i].Start, chapters[i].TimeBase)
 		if !ok {
 			t.Fatalf("could not convert time_base %q for chapter %d", chapters[i].TimeBase, i)
 		}
 		return ms
 	}
 	end := func(i int) int64 {
-		ms, ok := timebaseToMillis(chapters[i].End, chapters[i].TimeBase)
+		ms, ok := media.TimebaseToMillis(chapters[i].End, chapters[i].TimeBase)
 		if !ok {
 			t.Fatalf("could not convert time_base %q for chapter %d", chapters[i].TimeBase, i)
 		}
@@ -288,11 +289,11 @@ func TestEndToEndMKVContainer(t *testing.T) {
 	}
 }
 
-// millisecondsOf converts a probeChapter's start to milliseconds using its
+// millisecondsOf converts a media.ProbeChapter's start to milliseconds using its
 // time_base, mirroring the production verification logic.
-func millisecondsOf(t *testing.T, c probeChapter) int64 {
+func millisecondsOf(t *testing.T, c media.ProbeChapter) int64 {
 	t.Helper()
-	ms, ok := timebaseToMillis(c.Start, c.TimeBase)
+	ms, ok := media.TimebaseToMillis(c.Start, c.TimeBase)
 	if !ok {
 		t.Fatalf("could not convert time_base %q", c.TimeBase)
 	}
@@ -300,13 +301,15 @@ func millisecondsOf(t *testing.T, c probeChapter) int64 {
 }
 
 // probeChaptersRaw runs ffprobe -show_chapters and returns the parsed chapters.
-func probeChaptersRaw(t *testing.T, path string) []probeChapter {
+func probeChaptersRaw(t *testing.T, path string) []media.ProbeChapter {
 	t.Helper()
-	out, err := probeJSON("-show_chapters", path)
+	out, err := media.ProbeJSON("-show_chapters", path)
 	if err != nil {
 		t.Fatalf("ffprobe failed: %v", err)
 	}
-	var pc probeChapters
+	var pc struct {
+		Chapters []media.ProbeChapter `json:"chapters"`
+	}
 	if err := json.Unmarshal(out, &pc); err != nil {
 		t.Fatalf("parse chapters: %v", err)
 	}
@@ -502,13 +505,21 @@ func makeTestContainer(t *testing.T, dir, container, durationSec string) string 
 
 // endMsOf converts a probeChapter's end to milliseconds using its time_base,
 // mirroring the production verification logic (same as millisecondsOf but for End).
-func endMsOf(t *testing.T, c probeChapter) int64 {
+func endMsOf(t *testing.T, c media.ProbeChapter) int64 {
 	t.Helper()
-	ms, ok := timebaseToMillis(c.End, c.TimeBase)
+	ms, ok := media.TimebaseToMillis(c.End, c.TimeBase)
 	if !ok {
 		t.Fatalf("could not convert end time_base %q", c.TimeBase)
 	}
 	return ms
+}
+
+// diff returns the absolute difference between two values.
+func diff(a, b int64) int64 {
+	if a > b {
+		return a - b
+	}
+	return b - a
 }
 
 // TestChapterRoundTripMP4AndMKV is the Phase 2A empirical verification that
@@ -566,7 +577,7 @@ func TestChapterRoundTripMP4AndMKV(t *testing.T) {
 				t.Errorf("[%s] source video was modified", container)
 			}
 
-			durationMs, err := getVideoDurationMs(video)
+			durationMs, err := media.GetVideoDurationMs(video)
 			if err != nil {
 				t.Fatalf("[%s] could not read source duration: %v", container, err)
 			}
@@ -601,12 +612,12 @@ func TestChapterRoundTripMP4AndMKV(t *testing.T) {
 			}
 
 			// Final chapter end equals the target media (source) duration. A
-			// 1 ms tolerance mirrors the production verifier's toleranceMs and
+			// 1 ms tolerance mirrors the production verifier's media.ToleranceMs and
 			// absorbs container-level rounding of the duration probe.
 			finalEnd := endMsOf(t, chapters[len(chapters)-1])
-			if diff(finalEnd, durationMs) > toleranceMs {
+			if diff(finalEnd, durationMs) > media.ToleranceMs {
 				t.Errorf("[%s] final chapter end = %d ms, want source duration %d ms (within %d ms)",
-					container, finalEnd, durationMs, toleranceMs)
+					container, finalEnd, durationMs, media.ToleranceMs)
 			}
 		})
 	}
@@ -637,7 +648,7 @@ func makeTestAudio(t *testing.T, dir, durationSec string) string {
 // the exact chapter count, exact titles, start timestamps converted through
 // each returned chapter's time_base, the end-chain invariant (each end equals
 // the next start; the final end equals the probed source duration within
-// toleranceMs), and that the source M4A remains byte-identical.
+// media.ToleranceMs), and that the source M4A remains byte-identical.
 //
 // The test skips only when ffmpeg/ffprobe are unavailable; if the tools exist
 // but M4A remuxing or verification fails, the test fails rather than skipping.
@@ -681,7 +692,7 @@ func TestChapterRoundTripM4A(t *testing.T) {
 		t.Errorf("source m4a was modified")
 	}
 
-	durationMs, err := getVideoDurationMs(m4a)
+	durationMs, err := media.GetVideoDurationMs(m4a)
 	if err != nil {
 		t.Fatalf("could not read source duration: %v", err)
 	}
@@ -714,11 +725,11 @@ func TestChapterRoundTripM4A(t *testing.T) {
 		}
 	}
 
-	// Final chapter end equals the probed source-media duration within toleranceMs.
+	// Final chapter end equals the probed source-media duration within media.ToleranceMs.
 	finalEnd := endMsOf(t, chapters[len(chapters)-1])
-	if diff(finalEnd, durationMs) > toleranceMs {
+	if diff(finalEnd, durationMs) > media.ToleranceMs {
 		t.Errorf("final chapter end = %d ms, want source duration %d ms (within %d ms)",
-			finalEnd, durationMs, toleranceMs)
+			finalEnd, durationMs, media.ToleranceMs)
 	}
 }
 
@@ -727,11 +738,11 @@ func TestChapterRoundTripM4A(t *testing.T) {
 // each chapter's container time_base to the project's millisecond precision, so
 // Parse(TXT) and FFprobe(FFmpeg(TXT)) can be compared directly. The Line field
 // has no probe equivalent and is left as its zero value.
-func probeToModel(t *testing.T, container string, probed []probeChapter) []chapters.Chapter {
+func probeToModel(t *testing.T, container string, probed []media.ProbeChapter) []chapters.Chapter {
 	t.Helper()
 	model := make([]chapters.Chapter, len(probed))
 	for i, c := range probed {
-		start, ok := timebaseToMillis(c.Start, c.TimeBase)
+		start, ok := media.TimebaseToMillis(c.Start, c.TimeBase)
 		if !ok {
 			t.Fatalf("[%s] chapter %d: cannot convert start time_base %q", container, i, c.TimeBase)
 		}
@@ -744,11 +755,11 @@ func probeToModel(t *testing.T, container string, probed []probeChapter) []chapt
 // time_base, so the end-chain (each end equals the next chapter's start; the
 // final end equals the media duration) can be verified against the derived ends
 // of the parsed model.
-func probeEndsMs(t *testing.T, container string, chapters []probeChapter) []int64 {
+func probeEndsMs(t *testing.T, container string, chapters []media.ProbeChapter) []int64 {
 	t.Helper()
 	ends := make([]int64, len(chapters))
 	for i, c := range chapters {
-		end, ok := timebaseToMillis(c.End, c.TimeBase)
+		end, ok := media.TimebaseToMillis(c.End, c.TimeBase)
 		if !ok {
 			t.Fatalf("[%s] chapter %d: cannot convert end time_base %q", container, i, c.TimeBase)
 		}
@@ -759,9 +770,9 @@ func probeEndsMs(t *testing.T, container string, chapters []probeChapter) []int6
 
 // requireRoundTripEqual proves the semantic equality Parse(TXT) ==
 // FFprobe(FFmpeg(TXT)) for one container: the probed model must match the parsed
-// model in count, order, start (within toleranceMs), and exact title, and each
+// model in count, order, start (within media.ToleranceMs), and exact title, and each
 // probed end must equal the derived end (the next chapter's start, or the media
-// duration for the final chapter) within toleranceMs. Failures identify the
+// duration for the final chapter) within media.ToleranceMs. Failures identify the
 // container and chapter index with both expected and actual values.
 func requireRoundTripEqual(t *testing.T, container string, parsed []chapters.Chapter, durationMs int64, probed []chapters.Chapter, probedEnds []int64) {
 	t.Helper()
@@ -770,7 +781,7 @@ func requireRoundTripEqual(t *testing.T, container string, parsed []chapters.Cha
 		return
 	}
 	for i := range parsed {
-		if diff(probed[i].Start, parsed[i].Start) > toleranceMs {
+		if diff(probed[i].Start, parsed[i].Start) > media.ToleranceMs {
 			t.Errorf("[%s] chapter %d start = %d ms, want %d ms", container, i, probed[i].Start, parsed[i].Start)
 		}
 		if probed[i].Title != parsed[i].Title {
@@ -780,7 +791,7 @@ func requireRoundTripEqual(t *testing.T, container string, parsed []chapters.Cha
 		if i+1 < len(parsed) {
 			wantEnd = parsed[i+1].Start
 		}
-		if diff(probedEnds[i], wantEnd) > toleranceMs {
+		if diff(probedEnds[i], wantEnd) > media.ToleranceMs {
 			t.Errorf("[%s] chapter %d end = %d ms, want %d ms", container, i, probedEnds[i], wantEnd)
 		}
 	}
@@ -841,7 +852,7 @@ func TestRoundTripParseEqualsProbe(t *testing.T) {
 				t.Fatalf("[%s] embed failed with code %d:\n%s", container, code, errStr)
 			}
 
-			durationMs, err := getVideoDurationMs(video)
+			durationMs, err := media.GetVideoDurationMs(video)
 			if err != nil {
 				t.Fatalf("[%s] could not read source duration: %v", container, err)
 			}

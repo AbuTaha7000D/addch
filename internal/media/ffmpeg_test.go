@@ -1,4 +1,4 @@
-package main
+package media
 
 import (
 	"os/exec"
@@ -10,12 +10,12 @@ import (
 )
 
 func TestBuildMetadata(t *testing.T) {
-	chapters := []chapters.Chapter{
+	chs := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},
 		{Start: 330000, Title: "Chapter 2", Line: 2},
 		{Start: 6150000, Title: "Final", Line: 3},
 	}
-	got := buildMetadata(chapters, 6150000)
+	got := BuildMetadata(chs, 6150000)
 
 	want := `;FFMETADATA1
 
@@ -38,25 +38,25 @@ END=6150000
 title=Final
 `
 	if got != want {
-		t.Errorf("buildMetadata mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+		t.Errorf("BuildMetadata mismatch:\ngot:\n%s\nwant:\n%s", got, want)
 	}
 }
 
 func TestBuildMetadataLastEndsAtDuration(t *testing.T) {
-	chapters := []chapters.Chapter{
+	chs := []chapters.Chapter{
 		{Start: 0, Title: "Intro", Line: 1},
 		{Start: 3000, Title: "Second", Line: 2},
 	}
 	// Duration is longer than the last chapter start.
-	got := buildMetadata(chapters, 10000)
+	got := BuildMetadata(chs, 10000)
 	if !strings.Contains(got, "END=10000\n") {
 		t.Errorf("expected last chapter END to equal duration 10000:\n%s", got)
 	}
 }
 
 func TestBuildMetadataSingleChapter(t *testing.T) {
-	chapters := []chapters.Chapter{{Start: 0, Title: "Whole", Line: 1}}
-	got := buildMetadata(chapters, 50000)
+	chs := []chapters.Chapter{{Start: 0, Title: "Whole", Line: 1}}
+	got := BuildMetadata(chs, 50000)
 	if !strings.Contains(got, "START=0\n") || !strings.Contains(got, "END=50000\n") {
 		t.Errorf("single chapter metadata incorrect:\n%s", got)
 	}
@@ -66,23 +66,23 @@ func TestBuildMetadataSingleChapter(t *testing.T) {
 }
 
 func TestBuildMetadataDoesNotMutateInput(t *testing.T) {
-	chapters := []chapters.Chapter{
+	chs := []chapters.Chapter{
 		{Start: 5000, Title: "b", Line: 2},
 		{Start: 0, Title: "a", Line: 1},
 	}
-	_ = buildMetadata(chapters, 10000)
+	_ = BuildMetadata(chs, 10000)
 	// Ensure original slice ordering is unchanged.
-	if chapters[0].Start != 5000 || chapters[1].Start != 0 {
-		t.Error("buildMetadata mutated the input slice")
+	if chs[0].Start != 5000 || chs[1].Start != 0 {
+		t.Error("BuildMetadata mutated the input slice")
 	}
 }
 
 func TestBuildMetadataSorts(t *testing.T) {
-	chapters := []chapters.Chapter{
+	chs := []chapters.Chapter{
 		{Start: 5000, Title: "later", Line: 2},
 		{Start: 0, Title: "earlier", Line: 1},
 	}
-	got := buildMetadata(chapters, 10000)
+	got := BuildMetadata(chs, 10000)
 	iLater := strings.Index(got, "title=later")
 	iEarlier := strings.Index(got, "title=earlier")
 	if iEarlier == -1 || iLater == -1 || iEarlier > iLater {
@@ -103,15 +103,15 @@ func TestEscapeMetadataTitle(t *testing.T) {
 		{`eq=bracket[ok] &% ;semi #hash`, `eq=bracket[ok] &% ;semi #hash`},
 	}
 	for _, c := range cases {
-		if got := escapeMetadataTitle(c.in); got != c.want {
-			t.Errorf("escapeMetadataTitle(%q) = %q, want %q", c.in, got, c.want)
+		if got := EscapeMetadataTitle(c.in); got != c.want {
+			t.Errorf("EscapeMetadataTitle(%q) = %q, want %q", c.in, got, c.want)
 		}
 	}
 }
 
 func TestBuildMetadataEscapesBackslash(t *testing.T) {
-	chapters := []chapters.Chapter{{Start: 0, Title: `Back\slash`, Line: 1}}
-	got := buildMetadata(chapters, 1000)
+	chs := []chapters.Chapter{{Start: 0, Title: `Back\slash`, Line: 1}}
+	got := BuildMetadata(chs, 1000)
 	if !strings.Contains(got, `title=Back\\slash`) {
 		t.Errorf("expected escaped backslash in metadata:\n%s", got)
 	}
@@ -122,16 +122,40 @@ func TestBuildMetadataEscapesBackslash(t *testing.T) {
 
 func TestBuildMetadataSpecialChars(t *testing.T) {
 	// '=', ';' and '#' must pass through unchanged; only backslash is escaped.
-	chapters := []chapters.Chapter{
+	chs := []chapters.Chapter{
 		{Start: 0, Title: "eq=a ;semi #hash", Line: 1},
 		{Start: 5000, Title: `back\slash`, Line: 2},
 	}
-	got := buildMetadata(chapters, 10000)
+	got := BuildMetadata(chs, 10000)
 	if !strings.Contains(got, "title=eq=a ;semi #hash\n") {
 		t.Errorf("expected = ; # unchanged:\n%s", got)
 	}
 	if !strings.Contains(got, `title=back\\slash`+"\n") {
 		t.Errorf("expected backslash escaped:\n%s", got)
+	}
+}
+
+func TestIsMP4Family(t *testing.T) {
+	cases := []struct {
+		ext  string
+		want bool
+	}{
+		{".mp4", true},
+		{".m4v", true},
+		{".mov", true},
+		{".3gp", true},
+		{".3g2", true},
+		{".MP4", true},
+		{".mkv", false},
+		{".webm", false},
+		{".avi", false},
+		{"", false},
+		{".mp3", false},
+	}
+	for _, c := range cases {
+		if got := IsMP4Family(c.ext); got != c.want {
+			t.Errorf("IsMP4Family(%q) = %v, want %v", c.ext, got, c.want)
+		}
 	}
 }
 
@@ -146,11 +170,11 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	}
 
 	// Overwrite => -y present; no overwrite => -y absent.
-	argsOver := buildFFmpegArgs("in.mp4", "meta.txt", "out.mp4", ".mp4", true)
+	argsOver := BuildFFmpegArgs("in.mp4", "meta.txt", "out.mp4", ".mp4", true)
 	if !has(argsOver, "-y") {
 		t.Errorf("expected -y when overwrite is true: %v", argsOver)
 	}
-	argsNo := buildFFmpegArgs("in.mp4", "meta.txt", "out.mp4", ".mp4", false)
+	argsNo := BuildFFmpegArgs("in.mp4", "meta.txt", "out.mp4", ".mp4", false)
 	if has(argsNo, "-y") {
 		t.Errorf("-y must NOT be present without --overwrite: %v", argsNo)
 	}
@@ -166,17 +190,17 @@ func TestBuildFFmpegArgs(t *testing.T) {
 	if !has(argsOver, "+faststart") {
 		t.Errorf("expected +faststart for .mp4: %v", argsOver)
 	}
-	mkvArgs := buildFFmpegArgs("in.mp4", "meta.txt", "out.mkv", ".mkv", false)
+	mkvArgs := BuildFFmpegArgs("in.mp4", "meta.txt", "out.mkv", ".mkv", false)
 	if has(mkvArgs, "+faststart") {
 		t.Errorf("+faststart must NOT be added for .mkv: %v", mkvArgs)
 	}
 	// Case-insensitive extension handling.
-	if !has(buildFFmpegArgs("in", "m", "out.MP4", ".MP4", false), "+faststart") {
+	if !has(BuildFFmpegArgs("in", "m", "out.MP4", ".MP4", false), "+faststart") {
 		t.Error("expected +faststart for .MP4 (case-insensitive)")
 	}
 }
 
-func TestFFmpegRemuxInterrupt(t *testing.T) {
+func TestRemuxProcessInterrupt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("uses Unix 'sleep' command")
 	}
@@ -184,12 +208,12 @@ func TestFFmpegRemuxInterrupt(t *testing.T) {
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start child: %v", err)
 	}
-	rp := newFFmpegRemux(cmd)
-	// interrupt() must kill the child and block until it is fully reaped.
+	rp := NewRemuxProcess(cmd)
+	// Interrupt() must kill the child and block until it is fully reaped.
 	// Exited() is true for a normal exit; a signal-killed child reports ExitCode -1.
-	rp.interrupt()
+	rp.Interrupt()
 	ps := rp.cmd.ProcessState
 	if ps == nil || (!ps.Exited() && ps.ExitCode() != -1) {
-		t.Fatal("child process did not exit after interrupt()")
+		t.Fatal("child process did not exit after Interrupt()")
 	}
 }

@@ -1,4 +1,7 @@
-package main
+// Package media implements the FFmpeg/FFprobe interaction core for the addch
+// toolkit: dependency checks, duration probing, chapter verification, and
+// FFmpeg remux execution.
+package media
 
 import (
 	"fmt"
@@ -48,61 +51,61 @@ func parseVersion(line string) *Version {
 	return nil
 }
 
-// dependencyInfo collects the presence and version of each required tool.
+// DependencyInfo collects the presence and version of each required tool.
 // It never runs any mutating command.
-type dependencyInfo struct {
-	ffmpegPath  string
-	ffprobePath string
-	ffmpegVer   *Version
-	ffprobeVer  *Version
-	ffmpegErr   error
-	ffprobeErr  error
+type DependencyInfo struct {
+	FFmpegPath  string
+	FFprobePath string
+	FFmpegVer   *Version
+	FFprobeVer  *Version
+	FFmpegErr   error
+	FFprobeErr  error
 }
 
-// checkDependencies probes for ffmpeg and ffprobe.
-func checkDependencies() dependencyInfo {
-	var di dependencyInfo
-	di.ffmpegPath = checkTool("ffmpeg")
-	di.ffprobePath = checkTool("ffprobe")
+// CheckDependencies probes for ffmpeg and ffprobe.
+func CheckDependencies() DependencyInfo {
+	var di DependencyInfo
+	di.FFmpegPath = checkTool("ffmpeg")
+	di.FFprobePath = checkTool("ffprobe")
 
-	if di.ffmpegPath != "" {
+	if di.FFmpegPath != "" {
 		out, err := exec.Command("ffmpeg", "-version").Output()
 		if err != nil {
-			di.ffmpegErr = err
+			di.FFmpegErr = err
 		} else {
-			di.ffmpegVer = parseVersion(string(out))
-			if di.ffmpegVer == nil {
-				di.ffmpegErr = fmt.Errorf("could not parse ffmpeg version output")
+			di.FFmpegVer = parseVersion(string(out))
+			if di.FFmpegVer == nil {
+				di.FFmpegErr = fmt.Errorf("could not parse ffmpeg version output")
 			}
 		}
 	}
-	if di.ffprobePath != "" {
+	if di.FFprobePath != "" {
 		out, err := exec.Command("ffprobe", "-version").Output()
 		if err != nil {
-			di.ffprobeErr = err
+			di.FFprobeErr = err
 		} else {
-			di.ffprobeVer = parseVersion(string(out))
-			if di.ffprobeVer == nil {
-				di.ffprobeErr = fmt.Errorf("could not parse ffprobe version output")
+			di.FFprobeVer = parseVersion(string(out))
+			if di.FFprobeVer == nil {
+				di.FFprobeErr = fmt.Errorf("could not parse ffprobe version output")
 			}
 		}
 	}
 	return di
 }
 
-// ready reports whether all required tools are present and functional.
-func (di dependencyInfo) ready() bool {
-	return di.ffmpegPath != "" && di.ffprobePath != "" &&
-		di.ffmpegErr == nil && di.ffprobeErr == nil
+// Ready reports whether all required tools are present and functional.
+func (di DependencyInfo) Ready() bool {
+	return di.FFmpegPath != "" && di.FFprobePath != "" &&
+		di.FFmpegErr == nil && di.FFprobeErr == nil
 }
 
-// listReports renders a line-by-line report of dependency status for --check.
+// ListReports renders a line-by-line report of dependency status for --check.
 // A present tool is marked with a check and its path (plus version when parsed);
 // a missing tool is marked clearly so the output is not misleading.
-func (di dependencyInfo) listReports() []string {
+func (di DependencyInfo) ListReports() []string {
 	lines := []string{
-		fmt.Sprintf("%s FFmpeg:  %s", statusMark(di.ffmpegPath != ""), presentOrMissing(di.ffmpegPath, di.ffmpegVer)),
-		fmt.Sprintf("%s FFprobe: %s", statusMark(di.ffprobePath != ""), presentOrMissing(di.ffprobePath, di.ffprobeVer)),
+		fmt.Sprintf("%s FFmpeg:  %s", statusMark(di.FFmpegPath != ""), presentOrMissing(di.FFmpegPath, di.FFmpegVer)),
+		fmt.Sprintf("%s FFprobe: %s", statusMark(di.FFprobePath != ""), presentOrMissing(di.FFprobePath, di.FFprobeVer)),
 	}
 	return lines
 }
@@ -124,14 +127,14 @@ func presentOrMissing(path string, v *Version) string {
 	return path
 }
 
-// installHint returns a human-readable message describing how to install
+// InstallHint returns a human-readable message describing how to install
 // FFmpeg on the detected platform, including the exact command to run.
-func installHint(di dependencyInfo) string {
+func (di DependencyInfo) InstallHint() string {
 	var missing []string
-	if di.ffmpegPath == "" {
+	if di.FFmpegPath == "" {
 		missing = append(missing, "ffmpeg")
 	}
-	if di.ffprobePath == "" {
+	if di.FFprobePath == "" {
 		missing = append(missing, "ffprobe")
 	}
 	if len(missing) == 0 {

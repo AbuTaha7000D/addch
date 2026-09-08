@@ -1,4 +1,4 @@
-package main
+package media
 
 import (
 	"encoding/json"
@@ -11,8 +11,8 @@ import (
 	"github.com/abutaha/addch/internal/chapters"
 )
 
-// probeJSON runs ffprobe with the given arguments and returns its stdout.
-func probeJSON(args ...string) ([]byte, error) {
+// ProbeJSON runs ffprobe with the given arguments and returns its stdout.
+func ProbeJSON(args ...string) ([]byte, error) {
 	full := append([]string{"-v", "quiet", "-print_format", "json"}, args...)
 	out, err := exec.Command("ffprobe", full...).Output()
 	if err != nil {
@@ -35,10 +35,10 @@ type probeFormat struct {
 	} `json:"format"`
 }
 
-// getVideoDurationMs returns the duration of a video in milliseconds using
+// GetVideoDurationMs returns the duration of a video in milliseconds using
 // ffprobe. Zero or negative durations and unparseable values result in an error.
-func getVideoDurationMs(videoPath string) (int64, error) {
-	out, err := probeJSON("-show_format", videoPath)
+func GetVideoDurationMs(videoPath string) (int64, error) {
+	out, err := ProbeJSON("-show_format", videoPath)
 	if err != nil {
 		return 0, fmt.Errorf("could not read video %q: %v — is it a valid video file?", videoPath, err)
 	}
@@ -49,7 +49,7 @@ func getVideoDurationMs(videoPath string) (int64, error) {
 	if pf.Format.Duration == "" || pf.Format.Duration == "N/A" {
 		return 0, fmt.Errorf("could not determine the duration of %q — is it a valid video file?", videoPath)
 	}
-	ms, err := parseDurationToMs(pf.Format.Duration)
+	ms, err := ParseDurationToMs(pf.Format.Duration)
 	if err != nil {
 		return 0, fmt.Errorf("could not parse duration %q for %q: %v", pf.Format.Duration, videoPath, err)
 	}
@@ -59,14 +59,14 @@ func getVideoDurationMs(videoPath string) (int64, error) {
 	return ms, nil
 }
 
-// parseDurationToMs converts an FFprobe duration string like "5", "5.1",
+// ParseDurationToMs converts an FFprobe duration string like "5", "5.1",
 // "5.123", "5.999" or "20.000000" into milliseconds using integer/decimal
 // parsing only (no floating-point arithmetic). If more than three fractional
 // digits are present, the value is truncated deterministically to millisecond
 // precision (consistent with the chapter timestamp parser). Zero is allowed
 // here; callers may reject it separately. Negative or non-numeric values are
 // errors.
-func parseDurationToMs(s string) (int64, error) {
+func ParseDurationToMs(s string) (int64, error) {
 	if s == "" || s == "N/A" {
 		return 0, fmt.Errorf("missing duration")
 	}
@@ -128,8 +128,8 @@ func allDigits(s string) bool {
 	return true
 }
 
-// probeChapter mirrors one chapter entry from ffprobe's -show_chapters.
-type probeChapter struct {
+// ProbeChapter mirrors one chapter entry from ffprobe's -show_chapters.
+type ProbeChapter struct {
 	ID        int    `json:"id"`
 	TimeBase  string `json:"time_base"`
 	Start     int64  `json:"start"`
@@ -142,17 +142,17 @@ type probeChapter struct {
 }
 
 type probeChapters struct {
-	Chapters []probeChapter `json:"chapters"`
+	Chapters []ProbeChapter `json:"chapters"`
 }
 
-// toleranceMs is the maximum acceptable difference between expected and
+// ToleranceMs is the maximum acceptable difference between expected and
 // verified chapter timestamps.
-const toleranceMs = 1
+const ToleranceMs = 1
 
-// timebaseToMillis converts a raw clock value to milliseconds given an
+// TimebaseToMillis converts a raw clock value to milliseconds given an
 // FFmpeg time_base string such as "1/1000" or "1/1000000000". It returns false
 // if the time_base cannot be parsed. Formula: ms = value * 1000 / denom.
-func timebaseToMillis(value int64, tb string) (int64, bool) {
+func TimebaseToMillis(value int64, tb string) (int64, bool) {
 	parts := strings.SplitN(tb, "/", 2)
 	if len(parts) != 2 {
 		return 0, false
@@ -166,10 +166,10 @@ func timebaseToMillis(value int64, tb string) (int64, bool) {
 	return (value * num * 1000) / den, true
 }
 
-// verifyChapters uses ffprobe to confirm that the output file contains exactly
+// VerifyChapters uses ffprobe to confirm that the output file contains exactly
 // the chapters we expected, with matching titles and start/end times.
-func verifyChapters(outputPath string, expected []chapters.Chapter, durationMs int64) error {
-	out, err := probeJSON("-show_chapters", outputPath)
+func VerifyChapters(outputPath string, expected []chapters.Chapter, durationMs int64) error {
+	out, err := ProbeJSON("-show_chapters", outputPath)
 	if err != nil {
 		return fmt.Errorf("verification failed for %q: %v", outputPath, err)
 	}
@@ -177,13 +177,13 @@ func verifyChapters(outputPath string, expected []chapters.Chapter, durationMs i
 	if err := json.Unmarshal(out, &pc); err != nil {
 		return fmt.Errorf("could not parse ffprobe chapter output for %q: %v", outputPath, err)
 	}
-	return compareChapters(pc.Chapters, expected, durationMs)
+	return CompareChapters(pc.Chapters, expected, durationMs)
 }
 
-// compareChapters verifies that the probeChapter list matches the expected
-// chapters in count, order, titles, and start/end times (within toleranceMs).
+// CompareChapters verifies that the ProbeChapter list matches the expected
+// chapters in count, order, titles, and start/end times (within ToleranceMs).
 // It is pure and unit-testable without a real file.
-func compareChapters(got []probeChapter, expected []chapters.Chapter, durationMs int64) error {
+func CompareChapters(got []ProbeChapter, expected []chapters.Chapter, durationMs int64) error {
 	if len(got) != len(expected) {
 		return fmt.Errorf("verification failed: expected %d chapters, found %d",
 			len(expected), len(got))
@@ -205,21 +205,21 @@ func compareChapters(got []probeChapter, expected []chapters.Chapter, durationMs
 			return fmt.Errorf("verification failed: chapter %d has title %q, expected %q",
 				i+1, gotCh.Tags.Title, expected[i].Title)
 		}
-		gotStart, ok := timebaseToMillis(gotCh.Start, gotCh.TimeBase)
+		gotStart, ok := TimebaseToMillis(gotCh.Start, gotCh.TimeBase)
 		if !ok {
 			return fmt.Errorf("verification failed: could not interpret time_base %q for chapter %d",
 				gotCh.TimeBase, i+1)
 		}
-		gotEnd, ok := timebaseToMillis(gotCh.End, gotCh.TimeBase)
+		gotEnd, ok := TimebaseToMillis(gotCh.End, gotCh.TimeBase)
 		if !ok {
 			return fmt.Errorf("verification failed: could not interpret time_base %q for chapter %d",
 				gotCh.TimeBase, i+1)
 		}
-		if diff(expected[i].Start, gotStart) > toleranceMs {
+		if diff(expected[i].Start, gotStart) > ToleranceMs {
 			return fmt.Errorf("verification failed: chapter %d start is %s, expected %s",
 				i+1, chapters.FormatMilliseconds(gotStart), chapters.FormatMilliseconds(expected[i].Start))
 		}
-		if diff(expectedEnds[i], gotEnd) > toleranceMs {
+		if diff(expectedEnds[i], gotEnd) > ToleranceMs {
 			return fmt.Errorf("verification failed: chapter %d end is %s, expected %s",
 				i+1, chapters.FormatMilliseconds(gotEnd), chapters.FormatMilliseconds(expectedEnds[i]))
 		}

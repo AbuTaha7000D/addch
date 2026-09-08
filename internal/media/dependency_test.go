@@ -1,4 +1,4 @@
-package main
+package media
 
 import (
 	"strings"
@@ -31,14 +31,14 @@ func TestParseVersion(t *testing.T) {
 
 func TestInstallHintMessages(t *testing.T) {
 	// When everything is present, no hint is returned.
-	di := dependencyInfo{ffmpegPath: "/usr/bin/ffmpeg", ffprobePath: "/usr/bin/ffprobe"}
-	if h := installHint(di); h != "" {
+	di := DependencyInfo{FFmpegPath: "/usr/bin/ffmpeg", FFprobePath: "/usr/bin/ffprobe"}
+	if h := di.InstallHint(); h != "" {
 		t.Errorf("expected no hint when present, got: %q", h)
 	}
 
 	// When ffmpeg is missing, the hint mentions ffmpeg and a command.
-	diMiss := dependencyInfo{ffprobePath: "/usr/bin/ffprobe"}
-	h := installHint(diMiss)
+	diMiss := DependencyInfo{FFprobePath: "/usr/bin/ffprobe"}
+	h := diMiss.InstallHint()
 	if h == "" {
 		t.Fatal("expected an install hint")
 	}
@@ -47,15 +47,15 @@ func TestInstallHintMessages(t *testing.T) {
 	}
 
 	// Both missing -> the message says "ffmpeg and ffprobe were".
-	bothMissing := installHint(dependencyInfo{})
+	bothMissing := (DependencyInfo{}).InstallHint()
 	if !strings.Contains(bothMissing, "were") {
 		t.Errorf("multiple-missing message should use 'were': %v", bothMissing)
 	}
 }
 
 func TestListReports(t *testing.T) {
-	di := dependencyInfo{ffmpegPath: "/x/ffmpeg", ffprobePath: ""}
-	lines := di.listReports()
+	di := DependencyInfo{FFmpegPath: "/x/ffmpeg", FFprobePath: ""}
+	lines := di.ListReports()
 	if len(lines) != 2 {
 		t.Fatalf("expected 2 report lines, got %d", len(lines))
 	}
@@ -67,24 +67,24 @@ func TestListReports(t *testing.T) {
 	}
 
 	// A parsed version is reported alongside the path.
-	diVer := dependencyInfo{ffmpegPath: "/x/ffmpeg", ffmpegVer: &Version{5, 1, 3}, ffprobePath: ""}
-	linesVer := diVer.listReports()
+	diVer := DependencyInfo{FFmpegPath: "/x/ffmpeg", FFmpegVer: &Version{5, 1, 3}, FFprobePath: ""}
+	linesVer := diVer.ListReports()
 	if !strings.Contains(linesVer[0], "5.1.3") {
 		t.Errorf("ffmpeg line should include version: %v", linesVer[0])
 	}
 }
 
 func TestReady(t *testing.T) {
-	empty := dependencyInfo{}
-	if empty.ready() {
+	empty := DependencyInfo{}
+	if empty.Ready() {
 		t.Error("empty dependency should not be ready")
 	}
-	di := dependencyInfo{ffmpegPath: "/a", ffprobePath: "/b"}
-	if !di.ready() {
+	di := DependencyInfo{FFmpegPath: "/a", FFprobePath: "/b"}
+	if !di.Ready() {
 		t.Error("fully populated dependency should be ready")
 	}
-	bad := dependencyInfo{ffmpegPath: "/a", ffprobePath: "/b", ffmpegErr: errTest}
-	if bad.ready() {
+	bad := DependencyInfo{FFmpegPath: "/a", FFprobePath: "/b", FFmpegErr: errTest}
+	if bad.Ready() {
 		t.Error("dependency with version error should not be ready")
 	}
 }

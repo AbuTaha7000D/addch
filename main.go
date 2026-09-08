@@ -9,6 +9,7 @@ import (
 
 	"github.com/abutaha/addch/internal/chapters"
 	"github.com/abutaha/addch/internal/fsutil"
+	"github.com/abutaha/addch/internal/media"
 )
 
 func main() {
@@ -44,24 +45,24 @@ func run(args []string, stdout, stderr io.Writer) int {
 func runCheck(stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "Checking dependencies...")
 	fmt.Fprintln(stdout)
-	di := checkDependencies()
-	for _, l := range di.listReports() {
+	di := media.CheckDependencies()
+	for _, l := range di.ListReports() {
 		fmt.Fprintln(stdout, l)
 	}
-	if di.ready() {
+	if di.Ready() {
 		fmt.Fprintln(stdout, "\nSystem is ready.")
 		return 0
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprint(stderr, installHint(di))
+	fmt.Fprint(stderr, di.InstallHint())
 	return 1
 }
 
 func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	// 1. Dependency check (fail fast, no modifications yet).
-	di := checkDependencies()
-	if !di.ready() {
-		fmt.Fprint(stderr, installHint(di))
+	di := media.CheckDependencies()
+	if !di.Ready() {
+		fmt.Fprint(stderr, di.InstallHint())
 		return 1
 	}
 	fmt.Fprintln(stdout, "✓ Dependencies found")
@@ -115,7 +116,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	}
 
 	// 7. Get video duration.
-	durationMs, err := getVideoDurationMs(pa.video)
+	durationMs, err := media.GetVideoDurationMs(pa.video)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
@@ -129,8 +130,8 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	fmt.Fprintln(stdout, "✓ Video duration checked")
 
 	// 9. Generate metadata and remux.
-	meta := buildMetadata(chs, durationMs)
-	metaPath, err := writeTempMetadata(meta)
+	meta := media.BuildMetadata(chs, durationMs)
+	metaPath, err := media.WriteTempMetadata(meta)
 	if err != nil {
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
@@ -152,7 +153,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	interrupted := make(chan os.Signal, 1)
 	signal.Notify(interrupted, os.Interrupt, syscall.SIGTERM)
 
-	rp, err := startFFmpegRemux(pa.video, metaPath, output, outputExt, pa.overwrite)
+	rp, err := media.StartRemux(pa.video, metaPath, output, outputExt, pa.overwrite)
 	if err != nil {
 		signal.Stop(interrupted)
 		os.Remove(metaPath)
@@ -162,7 +163,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 
 	select {
 	case sig := <-interrupted:
-		rp.interrupt() // kill, then wait for the child to actually stop
+		rp.Interrupt() // kill, then wait for the child to actually stop
 		signal.Stop(interrupted)
 		fsutil.CleanupFile(output)
 		os.Remove(metaPath)
@@ -173,7 +174,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 			return 143
 		}
 		return 130
-	case err = <-rp.done():
+	case err = <-rp.Done():
 		signal.Stop(interrupted)
 	}
 
@@ -185,7 +186,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	}
 
 	// 10. Verify.
-	if err := verifyChapters(output, chs, durationMs); err != nil {
+	if err := media.VerifyChapters(output, chs, durationMs); err != nil {
 		fsutil.CleanupFile(output)
 		fmt.Fprintf(stderr, "Error: %v\n", err)
 		return 1
