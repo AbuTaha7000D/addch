@@ -130,19 +130,29 @@ func TestParseArgsRecursiveWithOutput(t *testing.T) {
 	}
 }
 
-func TestParseArgsBatchModeWithPositionalArgs(t *testing.T) {
-	for _, args := range [][]string{
-		{"--dir", "ch.txt"},
-		{"--dir", "ch.txt", "vid.mp4"},
-		{"--recursive", "ch.txt", "vid.mp4"},
-	} {
+func TestParseArgsBatchModeMissingDirectory(t *testing.T) {
+	for _, args := range [][]string{{"--dir"}, {"--recursive"}} {
 		var out, errBuf bytes.Buffer
 		_, err := parseArgs(args, &out, &errBuf)
 		if err == nil {
-			t.Errorf("parseArgs(%v): expected error for batch mode with positional args", args)
+			t.Errorf("parseArgs(%v): expected error for missing directory", args)
 			continue
 		}
-		if !strings.Contains(err.Error(), "takes no positional arguments") {
+		if !strings.Contains(err.Error(), "requires a directory") {
+			t.Errorf("parseArgs(%v): unexpected error: %v", args, err)
+		}
+	}
+}
+
+func TestParseArgsBatchModeTooManyArguments(t *testing.T) {
+	for _, args := range [][]string{{"--dir", "a", "b"}, {"--recursive", "a", "b"}} {
+		var out, errBuf bytes.Buffer
+		_, err := parseArgs(args, &out, &errBuf)
+		if err == nil {
+			t.Errorf("parseArgs(%v): expected error for too many args in batch mode", args)
+			continue
+		}
+		if !strings.Contains(err.Error(), "exactly one directory") {
 			t.Errorf("parseArgs(%v): unexpected error: %v", args, err)
 		}
 	}
@@ -150,12 +160,15 @@ func TestParseArgsBatchModeWithPositionalArgs(t *testing.T) {
 
 func TestParseArgsDir(t *testing.T) {
 	var out, errBuf bytes.Buffer
-	pa, err := parseArgs([]string{"--dir"}, &out, &errBuf)
+	pa, err := parseArgs([]string{"--dir", "./videos"}, &out, &errBuf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !pa.dir || pa.recursive {
 		t.Errorf("expected dir=true, recursive=false, got %+v", pa)
+	}
+	if pa.dirPath != "./videos" {
+		t.Errorf("dirPath = %q, want ./videos", pa.dirPath)
 	}
 	if pa.chapters != "" || pa.video != "" {
 		t.Errorf("expected empty chapters/video in batch mode, got %+v", pa)
@@ -164,12 +177,18 @@ func TestParseArgsDir(t *testing.T) {
 
 func TestParseArgsRecursive(t *testing.T) {
 	var out, errBuf bytes.Buffer
-	pa, err := parseArgs([]string{"--recursive"}, &out, &errBuf)
+	pa, err := parseArgs([]string{"--recursive", "./videos"}, &out, &errBuf)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !pa.recursive || pa.dir {
 		t.Errorf("expected recursive=true, dir=false, got %+v", pa)
+	}
+	if pa.dirPath != "./videos" {
+		t.Errorf("dirPath = %q, want ./videos", pa.dirPath)
+	}
+	if pa.chapters != "" || pa.video != "" {
+		t.Errorf("expected empty chapters/video in batch mode, got %+v", pa)
 	}
 }
 

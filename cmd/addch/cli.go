@@ -52,6 +52,7 @@ type parsedArgs struct {
 	overwrite bool
 	dir       bool
 	recursive bool
+	dirPath   string
 	output    string
 	chapters  string
 	video     string
@@ -122,9 +123,13 @@ func parseArgs(args []string, stdout, stderr io.Writer) (*parsedArgs, error) {
 	case (pa.dir || pa.recursive) && pa.output != "":
 		return nil, fmt.Errorf("--output cannot be combined with --dir/--recursive batch mode.")
 	case pa.dir || pa.recursive:
-		if len(rest) != 0 {
-			return nil, fmt.Errorf("batch mode takes no positional arguments (got %d): %v", len(rest), rest)
+		switch {
+		case len(rest) == 0:
+			return nil, fmt.Errorf("batch mode requires a directory argument.")
+		case len(rest) != 1:
+			return nil, fmt.Errorf("batch mode takes exactly one directory argument (got %d): %v", len(rest), rest)
 		}
+		pa.dirPath = rest[0]
 		return pa, nil
 	}
 
