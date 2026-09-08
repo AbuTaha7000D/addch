@@ -84,14 +84,14 @@ end of every approved task so the next task is always explicit.
 
 - [x] Add shallow `--dir` and recursive `--recursive` modes. (Committed in `931d072`, `02b0259`.)
 - [x] Reject using `--dir` and `--recursive` together. (Committed in `931d072`, `02b0259`.)
-- [ ] Discover candidates using: supported media extension + exact matching
-  `<stem>.txt` sidecar + FFprobe validation.
-- [ ] Match sidecars correctly with Unicode and spaces.
-- [ ] Skip generated `-chapters` and `-nochapters` outputs to prevent chaining.
-- [ ] Process sequentially, continue after errors, and report success/skipped/
-  failed totals.
-- [ ] Handle Ctrl+C/SIGTERM: stop scheduling, kill and reap current FFmpeg,
-  clean temporary and partial files, then exit 130/143.
+- [x] Discover candidates using: supported media extension + exact matching
+  `<stem>.txt` sidecar + FFprobe validation. (Committed in `38d0e50` (discovery), `a75bb7b` (FFprobe validation).)
+- [x] Match sidecars correctly with Unicode and spaces. (Committed in `38d0e50`.)
+- [x] Skip generated `-chapters` and `-nochapters` outputs to prevent chaining. (Committed in `38d0e50`.)
+- [x] Process sequentially, continue after errors, and report success/skipped/
+  failed totals. (Committed in `a75bb7b`.)
+- [x] Handle Ctrl+C/SIGTERM: stop scheduling, kill and reap current FFmpeg,
+  clean temporary and partial files, then exit 130/143. (Committed in `a75bb7b`.)
 - [ ] Phase exit: batch and interrupt integration tests pass.
 
 ## Phase 5 — rmch
