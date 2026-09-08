@@ -11,11 +11,13 @@ end of every approved task so the next task is always explicit.
 
 ## Current position
 
-- Current branch: `main`
+- Current branch: `feature/chapter-toolkit`
 - Baseline tests: passing (`go test ./...`)
-- Current phase: **Phase 2** (empirical FFmpeg verification)
-- Last completed deliverable: `GRAMMAR.md`, committed as `e49c6d9` (`Add
-  chapter TXT grammar specification (GRAMMAR.md)`).
+- Current phase: **Phase 2 complete** — next: Phase 3 (shared core refactor)
+- Last completed deliverable: Phase 2 empirical verification, documented in
+  `FFMPEG_VERIFICATION.md` and finalized for M4A/AAC in `9f22159`, completed
+  by the round-trip proof `TestRoundTripParseEqualsProbe` in
+  `integration_test.go` (committed in `236078f`).
 
 ## Phase 0 — Baseline and scope decisions
 
@@ -53,13 +55,13 @@ end of every approved task so the next task is always explicit.
 - [x] Verify M4A/AAC audio chapter embedding through real FFmpeg/FFprobe,
   including time-base conversion, end-chain behavior, and copy-out safety.
   (Committed in `1c1985a`.)
-- [~] Update FFmpeg findings and the addch-only support matrix to include the
-  M4A/AAC evidence. (Approved; awaiting the user's commit.)
-- [ ] Prove round-trip behavior: parsed input equals parsed extraction, and
-  media chapters match at the supported precision.
+- [x] Update FFmpeg findings and the addch-only support matrix to include the
+  M4A/AAC evidence. (Committed in `9f22159`.)
+- [x] Prove round-trip behavior: parsed input equals parsed extraction, and
+  media chapters match at the supported precision. (Committed in `236078f`.)
 - [x] Document observed MP4/MKV FFmpeg behavior affecting the contract in
   `FFMPEG_VERIFICATION.md`. (Committed in `c245fe9`.)
-- [ ] Phase exit: integration results are documented and all ambiguity is
+- [x] Phase exit: integration results are documented and all ambiguity is
   settled by tests.
 
 ## Phase 3 — Shared core refactor
