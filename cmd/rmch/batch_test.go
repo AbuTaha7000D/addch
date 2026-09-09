@@ -175,3 +175,28 @@ func TestRunBatchOverwriteRegenerates(t *testing.T) {
 	}
 	requireZeroChapters(t, output)
 }
+
+func TestRunBatchRootErrors(t *testing.T) {
+	requireTools(t)
+
+	missing := filepath.Join(t.TempDir(), "missing")
+	out, errStr, code := runBatchForTest(missing, true, false)
+	if code != 1 {
+		t.Fatalf("missing recursive root: exit %d, want 1\nstdout:\n%s\nstderr:\n%s", code, out, errStr)
+	}
+	if !strings.Contains(errStr, "Error:") {
+		t.Errorf("missing recursive root: want an Error line on stderr, got:\n%s", errStr)
+	}
+
+	fileAsRoot := filepath.Join(t.TempDir(), "not-a-directory.mp4")
+	if err := os.WriteFile(fileAsRoot, []byte("dummy"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out, errStr, code = runBatchForTest(fileAsRoot, true, false)
+	if code != 1 {
+		t.Fatalf("file as recursive root: exit %d, want 1\nstdout:\n%s\nstderr:\n%s", code, out, errStr)
+	}
+	if !strings.Contains(errStr, "Error:") {
+		t.Errorf("file as recursive root: want an Error line on stderr, got:\n%s", errStr)
+	}
+}
