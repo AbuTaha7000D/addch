@@ -202,6 +202,49 @@ func TestCleanupFile(t *testing.T) {
 			t.Errorf("expected file to remain absent, stat err = %v", err)
 		}
 	})
+
+	t.Run("never removes a directory", func(t *testing.T) {
+		dir := t.TempDir()
+		empty := filepath.Join(dir, "output-dir")
+		if err := os.Mkdir(empty, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		CleanupFile(empty)
+		if fi, err := os.Stat(empty); err != nil || !fi.IsDir() {
+			t.Errorf("cleanup removed an existing empty directory: stat err = %v", err)
+		}
+		nonEmpty := filepath.Join(dir, "non-empty-dir")
+		if err := os.Mkdir(nonEmpty, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		child := filepath.Join(nonEmpty, "keep.txt")
+		if err := os.WriteFile(child, []byte("x"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		CleanupFile(nonEmpty)
+		if _, err := os.Stat(child); err != nil {
+			t.Errorf("non-empty directory must survive cleanup: %v", err)
+		}
+	})
+
+	t.Run("never removes a symlinked directory target", func(t *testing.T) {
+		dir := t.TempDir()
+		target := filepath.Join(dir, "real")
+		if err := os.Mkdir(target, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		link := filepath.Join(dir, "link")
+		if err := os.Symlink(target, link); err != nil {
+			t.Skipf("symlinks not supported: %v", err)
+		}
+		CleanupFile(link)
+		if fi, err := os.Stat(target); err != nil || !fi.IsDir() {
+			t.Errorf("cleanup removed the symlinked directory target: stat err = %v", err)
+		}
+		if _, err := os.Lstat(link); err != nil {
+			t.Errorf("cleanup removed the symlink itself: %v", err)
+		}
+	})
 }
 
 // sidecarTempLitter returns the number of WriteFileAtomic temp files left in dir.

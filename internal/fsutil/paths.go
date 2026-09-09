@@ -80,8 +80,13 @@ func OutputExtension(p string) string {
 }
 
 // CleanupFile removes a (possibly partial) output file, safely ignoring errors
-// when the file does not exist.
+// when the file does not exist. Directories are never removed: an adversarial
+// --overwrite run whose output path is an existing directory must fail cleanly
+// without deleting the user's directory.
 func CleanupFile(path string) {
+	if fi, err := os.Stat(path); err == nil && fi.IsDir() {
+		return
+	}
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
 		// Deliberately ignore cleanup errors; the file may belong to another process.
 		_ = err
