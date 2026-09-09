@@ -10,9 +10,10 @@ The repository is one Go module that builds **three standalone binaries**:
 | `rmch`  | **Remove** chapters from a video | `*-nochapters.<ext>` |
 | `getch` | **Extract** chapters from a video | stdout or `<name>.txt` sidecar |
 
-All three use **stream copy**, so the original video is **never modified** — they
-always write new output files. They share one internal core but remain
-independent executables.
+`addch` and `rmch` use **stream copy**, so the original video is **never
+modified** — they always write new output files. `getch` only reads chapters
+(`ffprobe`-only) and never writes video. All three share one internal core but
+remain independent executables.
 
 ---
 
@@ -93,14 +94,18 @@ For convenient use from any folder, add that download folder to your Windows
 addch --check
 ```
 
-This checks that `ffmpeg` and `ffprobe` are available and on your `PATH`. You
-should see a message like `System is ready.` and exit with success. The output is
-identical across all three tools:
+This checks that the required tools are available and on your `PATH`. When both
+`ffmpeg` and `ffprobe` are installed, all three tools print the same report and
+exit with success:
 
 ```sh
 rmch --check    # same output
 getch --check   # same output
 ```
+
+`getch` depends on **ffprobe only** and never invokes `ffmpeg`. So if `ffmpeg`
+is missing from your `PATH` but `ffprobe` is present, `getch --check` still
+succeeds, while `addch --check` and `rmch --check` fail with an install hint.
 
 **Step 5 — Create your chapter file**
 
@@ -296,8 +301,8 @@ getch --recursive ./videos      # writes <name>.txt sidecars (except no-chapter 
 ```
 
 Batch processing is **sequential** and **continues after individual errors**.
-Existing outputs are skipped unless you pass `--overwrite`, and `addch`/`rmch`
-never re-process their own generated `-chapters`/`-nochapters` outputs. Each run
+Existing outputs are skipped unless you pass `--overwrite`, and none of the tools
+ever re-process their own generated `-chapters`/`-nochapters` outputs. Each run
 ends with a summary line like:
 
 ```
@@ -315,7 +320,7 @@ Total: N | Succeeded: N | Skipped: N | Failed: N
 | `--dir` | Batch mode: files directly inside a directory | ✓ | ✓ | ✓ |
 | `--recursive` | Batch mode: directory and all subdirectories | ✓ | ✓ | ✓ |
 | `--example` | Write `example_chapters.txt` and exit | ✓ | — | — |
-| `--check` | Verify FFmpeg/FFprobe availability, identical output | ✓ | ✓ | ✓ |
+| `--check` | Verify FFmpeg/FFprobe availability (`addch`/`rmch` need both; `getch` needs `ffprobe` only) | ✓ | ✓ | ✓ |
 | `--version` | Print the version and exit | ✓ | ✓ | ✓ |
 | `-h, --help` | Print this help and exit | ✓ | ✓ | ✓ |
 
@@ -328,6 +333,8 @@ Notes:
 - `--output` cannot be combined with `--dir`/`--recursive` batch mode.
 - All tools will not overwrite an existing output file unless you use
   `--overwrite`.
+- `getch` in single-file mode requires `--overwrite` together with `--output`,
+  because its default target is stdout (which cannot be overwritten).
 - No tool ever overwrites your input video (or your chapter file).
 - Paths containing spaces or Unicode work everywhere; just quote them if your
   shell requires it (e.g. `addch chapters.txt "My Course.mp4"`).
