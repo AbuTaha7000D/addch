@@ -10,6 +10,9 @@ import (
 // signal-handling tests. The env var check happens before m.Run(), so the
 // testing framework never parses the CLI arguments as test flags.
 func TestMain(m *testing.M) {
+	if maybeRunFakeTool() {
+		return
+	}
 	if os.Getenv("ADDCH_TEST_BINARY") == "1" {
 		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 	}

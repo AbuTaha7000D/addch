@@ -17,6 +17,9 @@ import (
 // (which globs the same addch-metadata-* pattern in the shared tempdir) from
 // racing with getch when both packages run concurrently.
 func TestMain(m *testing.M) {
+	if maybeRunFakeTool() {
+		return
+	}
 	if os.Getenv("GETCH_TEST_BINARY") == "1" {
 		os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 	}
