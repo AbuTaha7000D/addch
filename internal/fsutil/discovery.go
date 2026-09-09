@@ -141,7 +141,21 @@ func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
 		return fmt.Errorf("%q is not a directory", dir)
 	}
 	if recursive {
-		return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
+		walkRoot := dir
+		// A batch root that is itself a symlink to a directory must be resolved
+		// before walking: filepath.WalkDir Lstats the root entry and treats a
+		// symlink as a non-directory, so an unresolved symlink root would be
+		// silently reported as empty. Resolving it makes recursion descend into
+		// the target; reported paths then appear in the resolved (real) form.
+		// Non-symlink roots are walked exactly as before.
+		if li, err := os.Lstat(dir); err == nil && li.Mode()&os.ModeSymlink != 0 {
+			resolved, err := filepath.EvalSymlinks(dir)
+			if err != nil {
+				return fmt.Errorf("cannot resolve symlinked batch root %q: %w", dir, err)
+			}
+			walkRoot = resolved
+		}
+		return filepath.WalkDir(walkRoot, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {
 				return nil
 			}
