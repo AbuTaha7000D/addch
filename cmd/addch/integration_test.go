@@ -317,9 +317,15 @@ func probeChaptersRaw(t *testing.T, path string) []media.ProbeChapter {
 }
 
 // countTempMetadata returns the number of addch temp metadata files currently
-// in the system temp directory.
+// in the metadata temp directory. When ADDCH_METADATA_TMPDIR is set the count
+// is scoped to that private directory (see media.WriteTempMetadata); otherwise
+// the system temp directory is used.
 func countTempMetadata() int {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "addch-metadata-*"))
+	dir := os.Getenv("ADDCH_METADATA_TMPDIR")
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, "addch-metadata-*"))
 	return len(matches)
 }
 
@@ -349,6 +355,7 @@ func TestEndToEndOverwriteNeverTouchesInput(t *testing.T) {
 
 func TestEndToEndPreservesChapterFileAndCleansTemp(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	video := makeTestVideo(t, dir, "10")

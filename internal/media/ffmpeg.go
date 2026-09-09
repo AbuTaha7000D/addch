@@ -54,8 +54,17 @@ func BuildMetadata(chs []chapters.Chapter, durationMs int64) string {
 
 // WriteTempMetadata writes the metadata content to a secure temporary file and
 // returns its path. The caller is responsible for removing the file.
+//
+// The directory defaults to os.TempDir(); tests that assert on temp-file
+// cleanup can override it via the ADDCH_METADATA_TMPDIR environment variable
+// to keep the count hermetic (immune to concurrent test binaries sharing the
+// system temp directory).
 func WriteTempMetadata(content string) (string, error) {
-	f, err := os.CreateTemp("", "addch-metadata-*.txt")
+	dir := os.Getenv("ADDCH_METADATA_TMPDIR")
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	f, err := os.CreateTemp(dir, "addch-metadata-*.txt")
 	if err != nil {
 		return "", fmt.Errorf("could not create temporary metadata file: %w", err)
 	}

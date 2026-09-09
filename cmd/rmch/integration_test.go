@@ -168,10 +168,16 @@ func probeStreamsRaw(t *testing.T, path string) []streamInfo {
 }
 
 // countTempMetadata returns the number of addch temp metadata files currently
-// in the system temp directory (rmch never creates them, so any change signals
-// a leak from its fixtures or pipeline).
+// in the metadata temp directory (rmch never creates them, so any change
+// signals a leak from its fixtures or pipeline). When ADDCH_METADATA_TMPDIR is
+// set the count is scoped to that private directory (see media.WriteTempMetadata);
+// otherwise the system temp directory is used.
 func countTempMetadata() int {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "addch-metadata-*"))
+	dir := os.Getenv("ADDCH_METADATA_TMPDIR")
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, "addch-metadata-*"))
 	return len(matches)
 }
 

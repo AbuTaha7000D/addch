@@ -156,10 +156,16 @@ func chaptersFromRaw(t *testing.T, path string) []chapters.Chapter {
 }
 
 // countTempMetadata returns the number of addch temp metadata files currently
-// in the system temp directory (getch fixtures create them through the shared
-// media core; none may leak).
+// in the metadata temp directory (getch fixtures create them through the shared
+// media core; none may leak). When ADDCH_METADATA_TMPDIR is set the count is
+// scoped to that private directory (see media.WriteTempMetadata); otherwise the
+// system temp directory is used.
 func countTempMetadata() int {
-	matches, _ := filepath.Glob(filepath.Join(os.TempDir(), "addch-metadata-*"))
+	dir := os.Getenv("ADDCH_METADATA_TMPDIR")
+	if dir == "" {
+		dir = os.TempDir()
+	}
+	matches, _ := filepath.Glob(filepath.Join(dir, "addch-metadata-*"))
 	return len(matches)
 }
 
