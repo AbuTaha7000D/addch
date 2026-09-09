@@ -202,7 +202,8 @@ func (r *RemuxProcess) startReaping() {
 }
 
 // Wait blocks until FFmpeg exits and returns a descriptive error on failure.
-// It may be called at any number of times.
+// The result is delivered exactly once: call Wait once, or consume Done once;
+// a second call after the result was received would block on the empty channel.
 func (r *RemuxProcess) Wait() error {
 	r.startReaping()
 	return <-r.errC
