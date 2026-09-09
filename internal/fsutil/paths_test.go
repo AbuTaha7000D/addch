@@ -1,6 +1,8 @@
 package fsutil
 
 import (
+	"crypto/sha256"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -320,4 +322,69 @@ func TestWriteFileAtomic(t *testing.T) {
 			t.Errorf("target must not exist: %v", err)
 		}
 	})
+}
+
+// TestWriteFileAtomicNeverClobbersInput is the Phase 8 item 4 proof at the unit
+// level: the atomic replacement of a target leaves the temporary file
+// completely gone (no .addch-sidecar-* or .tmp-* remnants) and never clobbers a
+// separate, pre-existing input file that shares the directory — the input's
+// bytes (SHA-256) and modification time must survive untouched.
+func TestWriteFileAtomicNeverClobbersInput(t *testing.T) {
+	dir := t.TempDir()
+
+	input := filepath.Join(dir, "input.txt")
+	const inputData = "original input; owns its own hash"
+	if err := os.WriteFile(input, []byte(inputData), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	inputBefore, err := os.ReadFile(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	inputBeforeHash := fmt.Sprintf("%x", sha256.Sum256(inputBefore))
+	inputFi, err := os.Stat(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	target := filepath.Join(dir, "out.txt")
+	if err := os.WriteFile(target, []byte("stale"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	const content = "00:00:00 Intro\n00:00:03 Middle\n"
+	if err := WriteFileAtomic(target, []byte(content)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("read back target: %v", err)
+	}
+	if string(got) != content {
+		t.Errorf("target content = %q, want %q", got, content)
+	}
+
+	// The unrelated input file is byte-identical and was not rewritten in place.
+	inputAfter, err := os.ReadFile(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotHash := fmt.Sprintf("%x", sha256.Sum256(inputAfter)); gotHash != inputBeforeHash {
+		t.Errorf("input file was modified: hash %s, want %s", gotHash, inputBeforeHash)
+	}
+	inputAfterFi, err := os.Stat(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !inputAfterFi.ModTime().Equal(inputFi.ModTime()) {
+		t.Errorf("input modification time changed: %v, want %v", inputAfterFi.ModTime(), inputFi.ModTime())
+	}
+
+	// No temp file of either naming convention survives in the shared directory.
+	if n := sidecarTempLitter(dir); n != 0 {
+		t.Errorf("sidecar temp files leaked: %d", n)
+	}
+	if matches, _ := filepath.Glob(filepath.Join(dir, ".tmp-*")); len(matches) != 0 {
+		t.Errorf("tmp temp files leaked: %v", matches)
+	}
 }
