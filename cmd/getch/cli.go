@@ -29,17 +29,18 @@ A file with no chapters produces empty stdout and exits 0. Diagnostics and
 per-item batch reports go to stderr; stdout carries only chapter data.
 
 Options:
-  -o, --output <file>  Custom output path, written atomically (default: stdout)
-      --overwrite      Replace the output file if it already exists
-      --dir            Batch mode: extract chapters for each media file directly inside a directory
-      --recursive      Batch mode: extract chapters for a directory and all nested subdirectories
+  -o, --output <file>  Custom output path (default: stdout)
+      --overwrite      Overwrite the output file if it already exists
+      --dir            Batch mode: process the media files directly inside a directory
+      --recursive      Batch mode: process a directory and all nested subdirectories
       --check          Verify ffmpeg/ffprobe availability and exit
       --version        Print version and exit
   -h, --help           Print this help and exit
 
 In batch mode each media file's chapters are written next to it as
 "<name>.txt" (the addch sidecar), except when the file has no chapters or a
-sidecar already exists.
+sidecar already exists. Output files are written atomically; a reader never
+sees a partial file.
 
 Examples:
   getch "My Course.mp4"
