@@ -1,7 +1,9 @@
 package media
 
 import (
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -291,5 +293,59 @@ func TestRemuxProcessInterrupt(t *testing.T) {
 	ps := rp.cmd.ProcessState
 	if ps == nil || (!ps.Exited() && ps.ExitCode() != -1) {
 		t.Fatal("child process did not exit after Interrupt()")
+	}
+}
+
+// TestRemuxErrorIncludesFFmpegDiagnostic proves the stderr-enriched error is
+// delivered through Done() (M1 regression): the raw exit error must never leak,
+// and neither may the diagnostic be swallowed by the raw channel value.
+func TestRemuxErrorIncludesFFmpegDiagnostic(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses Unix 'sh' substitute command")
+	}
+	cmd := exec.Command("sh", "-c", `printf "custom diagnostic" >&2; exit 234`)
+	rp := NewRemuxProcess(cmd)
+	if err := cmd.Start(); err != nil {
+		t.Fatalf("start substitute command: %v", err)
+	}
+	err := <-rp.Done()
+	if err == nil {
+		t.Fatal("expected an error from the failing substitute command")
+	}
+	if !strings.HasPrefix(err.Error(), "FFmpeg failed to remux the video: ") {
+		t.Errorf("error should carry the enriched prefix, got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "custom diagnostic") {
+		t.Errorf("error should include the command's stderr diagnostic, got: %v", err)
+	}
+}
+
+// TestStartStripErrorIncludesRealFFmpegDiagnostic proves Wait() also returns the
+// stderr-enriched error on a real ffmpeg failure: a non-media input fails with
+// a diagnostic that must reach the caller instead of a bare exit error.
+func TestStartStripErrorIncludesRealFFmpegDiagnostic(t *testing.T) {
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		t.Skip("integration test skipped: ffmpeg not found in PATH")
+	}
+	dir := t.TempDir()
+	in := filepath.Join(dir, "bad.mkv")
+	if err := os.WriteFile(in, []byte("this is not a media file"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	out := filepath.Join(dir, "out.mkv")
+
+	rp, err := StartStrip(in, out, ".mkv", false)
+	if err != nil {
+		t.Fatalf("StartStrip: %v", err)
+	}
+	werr := rp.Wait()
+	if werr == nil {
+		t.Fatal("expected ffmpeg to fail on a non-media input")
+	}
+	if !strings.Contains(werr.Error(), "Invalid data found when processing input") {
+		t.Errorf("error should carry ffmpeg's diagnostic, got: %v", werr)
+	}
+	if strings.Contains(werr.Error(), "exit status") {
+		t.Errorf("raw exit error must not leak to the caller, got: %v", werr)
 	}
 }

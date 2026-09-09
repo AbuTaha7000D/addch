@@ -272,6 +272,38 @@ func TestFindCandidatesMissingDir(t *testing.T) {
 	}
 }
 
+func TestFindCandidatesMissingDirRecursive(t *testing.T) {
+	// M2 regression: --recursive <nonexistent> previously exited 0 by silently
+	// swallowing the walk error; a missing root must now be an error.
+	if _, err := FindCandidates(filepath.Join(t.TempDir(), "absent"), true); err == nil {
+		t.Error("expected an error for a missing recursive root")
+	}
+}
+
+func TestFindCandidatesFileAsRoot(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "plain.txt")
+	writeFile(t, file)
+	for _, recursive := range []bool{false, true} {
+		if _, err := FindCandidates(file, recursive); err == nil {
+			t.Errorf("expected an error when the root is a file (recursive=%v)", recursive)
+		}
+	}
+}
+
+func TestFindCandidatesEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	for _, recursive := range []bool{false, true} {
+		candidates, err := FindCandidates(dir, recursive)
+		if err != nil {
+			t.Fatalf("empty valid dir must not error (recursive=%v): %v", recursive, err)
+		}
+		if len(candidates) != 0 {
+			t.Errorf("expected no candidates in an empty dir (recursive=%v): %+v", recursive, candidates)
+		}
+	}
+}
+
 func TestFindMediaFilesShallow(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "a.mp4"))
@@ -424,6 +456,38 @@ func TestFindMediaFilesDeterministicOrdering(t *testing.T) {
 func TestFindMediaFilesMissingDir(t *testing.T) {
 	if _, err := FindMediaFiles(filepath.Join(t.TempDir(), "absent"), false); err == nil {
 		t.Error("expected an error for a missing directory")
+	}
+}
+
+func TestFindMediaFilesMissingDirRecursive(t *testing.T) {
+	// M2 regression: rmch --recursive <nonexistent> previously exited 0 by
+	// silently swallowing the walk error; a missing root must now be an error.
+	if _, err := FindMediaFiles(filepath.Join(t.TempDir(), "absent"), true); err == nil {
+		t.Error("expected an error for a missing recursive root")
+	}
+}
+
+func TestFindMediaFilesFileAsRoot(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "plain.txt")
+	writeFile(t, file)
+	for _, recursive := range []bool{false, true} {
+		if _, err := FindMediaFiles(file, recursive); err == nil {
+			t.Errorf("expected an error when the root is a file (recursive=%v)", recursive)
+		}
+	}
+}
+
+func TestFindMediaFilesEmptyDir(t *testing.T) {
+	dir := t.TempDir()
+	for _, recursive := range []bool{false, true} {
+		files, err := FindMediaFiles(dir, recursive)
+		if err != nil {
+			t.Fatalf("empty valid dir must not error (recursive=%v): %v", recursive, err)
+		}
+		if len(files) != 0 {
+			t.Errorf("expected no media files in an empty dir (recursive=%v): %+v", recursive, files)
+		}
 	}
 }
 

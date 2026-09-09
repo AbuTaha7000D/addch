@@ -93,10 +93,19 @@ func CheckDependencies() DependencyInfo {
 	return di
 }
 
-// Ready reports whether all required tools are present and functional.
+// Ready reports whether all required tools are present and functional. This is
+// the dependency gate for commands that both read and write chapters (addch,
+// rmch), so both ffmpeg and ffprobe must be available.
 func (di DependencyInfo) Ready() bool {
 	return di.FFmpegPath != "" && di.FFprobePath != "" &&
 		di.FFmpegErr == nil && di.FFprobeErr == nil
+}
+
+// ReadyFFprobe reports whether ffprobe alone is present and functional. This is
+// the dependency gate for read-only commands (getch) that extract chapters with
+// ffprobe and never invoke ffmpeg.
+func (di DependencyInfo) ReadyFFprobe() bool {
+	return di.FFprobePath != "" && di.FFprobeErr == nil
 }
 
 // ListReports renders a line-by-line report of dependency status for --check.
@@ -158,6 +167,31 @@ func (di DependencyInfo) InstallHint() string {
 	} else {
 		b.WriteString("There is no known one-line install command for " + prettyOS(osName) + ".\n")
 		b.WriteString("Please install FFmpeg from https://ffmpeg.org/download.html and ensure\nffmpeg and ffprobe are available in your PATH.\n")
+	}
+	return b.String()
+}
+
+// FFprobeInstallHint returns a human-readable message describing how to install
+// FFprobe on the detected platform, for commands that only need ffprobe (getch).
+// It returns "" when ffprobe is already present.
+func (di DependencyInfo) FFprobeInstallHint() string {
+	if di.FFprobePath != "" {
+		return ""
+	}
+
+	osName := runtime.GOOS
+	cmd := installCommand(osName)
+
+	var b strings.Builder
+	b.WriteString("ffprobe was not found in PATH.\n\n")
+	b.WriteString("getch requires FFprobe to read chapters.\n\n")
+	if cmd != "" {
+		b.WriteString("To install on this system (" + prettyOS(osName) + "), run:\n\n")
+		b.WriteString("\t" + cmd + "\n\n")
+		b.WriteString("Then make sure ffprobe is available in your PATH and run getch again.\n")
+	} else {
+		b.WriteString("There is no known one-line install command for " + prettyOS(osName) + ".\n")
+		b.WriteString("Please install FFmpeg from https://ffmpeg.org/download.html and ensure\nffprobe is available in your PATH.\n")
 	}
 	return b.String()
 }

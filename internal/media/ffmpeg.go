@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"sort"
 	"strings"
+	"sync"
 
 	"github.com/abutaha/addch/internal/chapters"
 )
@@ -138,21 +139,22 @@ type RemuxProcess struct {
 	cmd    *exec.Cmd
 	output *strings.Builder
 	errC   chan error
+	begin  sync.Once
 }
 
-// NewRemuxProcess wraps an already-started command and begins waiting for it in a
-// dedicated goroutine. Exactly one goroutine calls cmd.Wait(), so the child is
-// reaped exactly once. Separate from StartRemux to allow test injection of
-// substitute commands.
+// NewRemuxProcess wraps a command so its stdout and stderr are captured into a
+// single buffer. The writers are attached HERE so that os/exec captures the
+// child's output from the first byte: the buffer must be wired before the
+// command is started, which START starts with. The child is reaped exactly once
+// on the first Wait()/Done() call (or an Interrupt), so callers never race to
+// call cmd.Wait() themselves. Separate from StartRemux to allow test injection
+// of substitute commands.
 func NewRemuxProcess(cmd *exec.Cmd) *RemuxProcess {
 	var buf strings.Builder
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
 	r := &RemuxProcess{cmd: cmd, output: &buf}
 	r.errC = make(chan error, 1)
-	go func() {
-		r.errC <- cmd.Wait()
-	}()
 	return r
 }
 
@@ -160,10 +162,11 @@ func NewRemuxProcess(cmd *exec.Cmd) *RemuxProcess {
 // obtain its final error, or Interrupt() to terminate and reap the child.
 func StartRemux(inputVideo, inputMeta, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
 	cmd := exec.Command("ffmpeg", BuildFFmpegArgs(inputVideo, inputMeta, output, outputExt, overwrite)...)
+	rp := NewRemuxProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
 	}
-	return NewRemuxProcess(cmd), nil
+	return rp, nil
 }
 
 // StartStrip builds and starts the FFmpeg chapter-stripping command (rmch).
@@ -171,29 +174,45 @@ func StartRemux(inputVideo, inputMeta, output string, outputExt string, overwrit
 // Call Wait()/Done() for the final error, or Interrupt() to kill and reap.
 func StartStrip(inputVideo, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
 	cmd := exec.Command("ffmpeg", BuildStripArgs(inputVideo, output, outputExt, overwrite)...)
+	rp := NewRemuxProcess(cmd)
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
 	}
-	return NewRemuxProcess(cmd), nil
+	return rp, nil
+}
+
+// startReaping launches the goroutine that waits for the child and produces the
+// final (stderr-enriched) error. It is idempotent, so multiple Wait()/Done()
+// calls never double-reap the child.
+func (r *RemuxProcess) startReaping() {
+	r.begin.Do(func() {
+		go func() {
+			werr := r.cmd.Wait()
+			if werr == nil {
+				r.errC <- nil
+				return
+			}
+			msg := strings.TrimSpace(r.output.String())
+			if msg == "" {
+				msg = werr.Error()
+			}
+			r.errC <- fmt.Errorf("FFmpeg failed to remux the video: %s", msg)
+		}()
+	})
 }
 
 // Wait blocks until FFmpeg exits and returns a descriptive error on failure.
-// It must be called at most once.
+// It may be called at any number of times.
 func (r *RemuxProcess) Wait() error {
-	err := <-r.errC
-	if err != nil {
-		msg := strings.TrimSpace(r.output.String())
-		if msg == "" {
-			msg = err.Error()
-		}
-		return fmt.Errorf("FFmpeg failed to remux the video: %s", msg)
-	}
-	return nil
+	r.startReaping()
+	return <-r.errC
 }
 
 // Done returns a channel that yields the remux result exactly once, when the
-// child exits. It is useful for select-based waiting alongside a signal channel.
+// child exits. The error is the same stderr-enriched one produced by Wait, so
+// select-based waiters (alongside a signal channel) receive the diagnostic too.
 func (r *RemuxProcess) Done() <-chan error {
+	r.startReaping()
 	return r.errC
 }
 

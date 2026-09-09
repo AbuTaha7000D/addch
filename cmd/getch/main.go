@@ -52,12 +52,12 @@ func runCheck(stdout, stderr io.Writer) int {
 	for _, l := range di.ListReports() {
 		fmt.Fprintln(stdout, l)
 	}
-	if di.Ready() {
+	if di.ReadyFFprobe() {
 		fmt.Fprintln(stdout, "\nSystem is ready.")
 		return 0
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprint(stderr, di.InstallHint())
+	fmt.Fprint(stderr, di.FFprobeInstallHint())
 	return 1
 }
 
@@ -72,10 +72,11 @@ func runCheck(stdout, stderr io.Writer) int {
 // up (renamed or removed) before we act on the signal, so no interruption can
 // orphan a partial artifact.
 func runExtract(pa *parsedArgs, stdout, stderr io.Writer) int {
-	// 1. Dependency check (fail fast, no modifications yet).
+	// 1. Dependency check (fail fast, no modifications yet). getch only needs
+	// ffprobe: it reads chapters and never runs ffmpeg.
 	di := media.CheckDependencies()
-	if !di.Ready() {
-		fmt.Fprint(stderr, di.InstallHint())
+	if !di.ReadyFFprobe() {
+		fmt.Fprint(stderr, di.FFprobeInstallHint())
 		return 1
 	}
 	fmt.Fprintln(stderr, "✓ Dependencies found")
@@ -179,10 +180,11 @@ func runExtract(pa *parsedArgs, stdout, stderr io.Writer) int {
 // the process exits 130/143. Chapter data is never written to stdout; the
 // per-item report and totals go to stderr.
 func runBatch(pa *parsedArgs, stdout, stderr io.Writer) int {
-	// 1. Dependency check (fail fast, no changes yet).
+	// 1. Dependency check (fail fast, no changes yet). getch only needs
+	// ffprobe: it reads chapters and never runs ffmpeg.
 	di := media.CheckDependencies()
-	if !di.Ready() {
-		fmt.Fprint(stderr, di.InstallHint())
+	if !di.ReadyFFprobe() {
+		fmt.Fprint(stderr, di.FFprobeInstallHint())
 		return 1
 	}
 	fmt.Fprintln(stderr, "✓ Dependencies found")

@@ -1,6 +1,7 @@
 package fsutil
 
 import (
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -128,8 +129,17 @@ func FindMediaFiles(dir string, recursive bool) ([]string, error) {
 // supported extension that is not a generated output — shallow or recursive,
 // calling visit for each. Subdirectories are skipped in both modes. The shared
 // traversal is what keeps the two discovery flavors' ordering and filtering
-// identical.
+// identical. The root dir is validated up front so a missing or non-directory
+// batch root is reported as an error instead of silently succeeding with zero
+// results.
 func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
+	info, err := os.Stat(dir)
+	if err != nil {
+		return err
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("%q is not a directory", dir)
+	}
 	if recursive {
 		return filepath.WalkDir(dir, func(path string, d fs.DirEntry, err error) error {
 			if err != nil {

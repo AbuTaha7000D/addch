@@ -87,6 +87,55 @@ func TestReady(t *testing.T) {
 	if bad.Ready() {
 		t.Error("dependency with version error should not be ready")
 	}
+	ffOnly := DependencyInfo{FFprobePath: "/b"}
+	if ffOnly.Ready() {
+		t.Error("ffprobe-only dependency must not be ready for addch/rmch")
+	}
+}
+
+func TestReadyFFprobe(t *testing.T) {
+	empty := DependencyInfo{}
+	if empty.ReadyFFprobe() {
+		t.Error("empty dependency should not be ready for ffprobe-only")
+	}
+	di := DependencyInfo{FFprobePath: "/b"}
+	if !di.ReadyFFprobe() {
+		t.Error("ffprobe-only dependency should be ready")
+	}
+	// getch must not care whether ffmpeg is present at all.
+	full := DependencyInfo{FFmpegPath: "/a", FFprobePath: "/b"}
+	if !full.ReadyFFprobe() {
+		t.Error("full dependency should also be ready for ffprobe-only")
+	}
+	bad := DependencyInfo{FFprobePath: "/b", FFprobeErr: errTest}
+	if bad.ReadyFFprobe() {
+		t.Error("dependency with ffprobe version error should not be ready")
+	}
+}
+
+func TestFFprobeInstallHintMessages(t *testing.T) {
+	// When ffprobe is present, no hint is returned even if ffmpeg is missing.
+	di := DependencyInfo{FFprobePath: "/usr/bin/ffprobe"}
+	if h := di.FFprobeInstallHint(); h != "" {
+		t.Errorf("expected no hint when ffprobe present, got: %q", h)
+	}
+
+	diMiss := DependencyInfo{}
+	h := diMiss.FFprobeInstallHint()
+	if h == "" {
+		t.Fatal("expected an install hint when ffprobe is missing")
+	}
+	if !strings.Contains(h, "ffprobe") {
+		t.Errorf("hint should mention ffprobe: %v", h)
+	}
+	if !strings.Contains(h, "getch") {
+		t.Errorf("hint should be scoped to getch: %v", h)
+	}
+	// An ffmpeg-only presence must not suppress the ffprobe hint.
+	ffmpegOnly := DependencyInfo{FFmpegPath: "/usr/bin/ffmpeg"}
+	if h := ffmpegOnly.FFprobeInstallHint(); h == "" || !strings.Contains(h, "ffprobe") {
+		t.Errorf("expected ffprobe hint even when ffmpeg is present, got: %q", h)
+	}
 }
 
 func TestCommandForOSRelease(t *testing.T) {
