@@ -346,10 +346,10 @@ rejected by **validation** (rule 6 #3 above) because the media layer
 
 ## 9. Canonical Output (getch — contract)
 
-> **Status note:** `getch` is not yet implemented (v0.2 planning). The rules in
-> this section are **contract requirements** — the required behavior of the
-> future `getch` command — not a description of shipping behavior. They are to
-> be implemented and verified in Phase 2 ([§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified)).
+> **Status note:** `getch` is implemented (Phase 2) and its canonical-output
+> contract is verified against real FFmpeg/FFprobe by the command integration
+> tests. The rules in this section are therefore both contract requirements and
+> verified shipping behavior.
 
 `getch` MUST emit the canonical form, which is also the form re-parseable by
 `addch`/`rmch`:
@@ -395,8 +395,10 @@ states:
   FFmpeg.
 * **Media/FFprobe round-trip** depends on `addch`, `getch`, `rmch` (and the
   FFMETADATA escaping) engaging FFmpeg/FFprobe correctly. It is a **contract
-  requirement to be verified in Phase 2** — it is not claimed as established
-  behavior in this document.
+  requirement** ([§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified))
+  that the Phase 2 implementation verifies with real FFmpeg/FFprobe; the
+  evidence is recorded in `FFMPEG_VERIFICATION.md`, scoped to the containers
+  that suite tests.
 
 ### 10.1 TXT semantic round-trip (grammar-guaranteed)
 
@@ -445,15 +447,21 @@ matters is equality of the parsed `(start_ms, title)` lists.
 
 ### 10.2 Media/FFprobe round-trip (contract requirement — Phase-2-verified)
 
-The following are **not** established by the current implementation — `getch`
-does not exist and the media-layer behavior of `rmch`/`getch` has not been
-empirically verified. They are **contract requirements** that the v0.2
-implementation MUST satisfy and prove with integration tests before any claim
-of media-level losslessness is made:
+The following are **verified behavior** of the current implementation, each
+scoped to the containers its own proof exercises; the authoritative
+per-command support matrix is TOOLKIT_SCOPE.md §Container support. The
+media-layer behavior of `rmch`/`getch` was not established by `addch` v0.1.0,
+so v0.2 made these **contract requirements**: the implementation MUST prove
+them with integration tests before any claim of media-level losslessness is
+made. That proof now exists in the Phase 2 real-FFmpeg/FFprobe integration
+suite (`FFMPEG_VERIFICATION.md`), and the verified container scope is recorded
+with each requirement below:
 
 * **R1 — addch → getch fidelity:** `getch video.mp4` returns exactly the
   millisecond start times and exact title bytes that `addch` embedded in that
   video (media→TXT direction).
+  **Verified scope:** MP4/MKV — `TestExtractMP4` / `TestExtractMKV`
+  (`cmd/getch`).
 * **R2 — full chain equality:** for
 
   ```text
@@ -463,6 +471,7 @@ of media-level losslessness is made:
   the chapters observed by FFprobe in `v1` and `v2` are equal in their ordered
   **`(start_ms, title)`** pairs. This is the general comparison that holds
   regardless of the target media.
+  **Verified scope:** MP4/MKV — `TestExtractRoundTripFullChain` (`cmd/getch`).
 
   **End times are a separate, same-duration claim.** A chapter's `end_ms` is
   not part of the TXT grammar: `addch` derives each chapter's `end_ms` from the
@@ -478,13 +487,19 @@ of media-level losslessness is made:
   `#`, quotes, literal `\n`/`\t`/`\r` text, non-final backslash). The
   trailing-backslash case is excluded by construction (rejected by
   validation, rule 6 #3).
+  **Verified scope:** MP4/MKV/M4A — the addch round-trip proofs
+  (`TestChapterRoundTripMP4AndMKV`, `TestChapterRoundTripM4A`,
+  `TestRoundTripParseEqualsProbe`).
 * **R4 — parser-level addition:** `ParseChaptersFile(extracted.txt)` must
   produce a chapter list identical to `ParseChaptersFile(original.txt)` (this
   ties the media tier back to the TXT tier).
+  **Verified scope:** MP4/MKV — the getch extraction proofs listed under R1.
 
-Compliance with R1–R3 requires real-FFmpeg integration tests (remux with
-adversarial titles, read back with FFprobe, compare exact strings) — the same
-approach already used to audit `addch` v0.1.0.
+Compliance with R1, R2, and R4 is verified for **MP4/MKV** by the getch
+extraction proofs; compliance with **R3** — and `addch` embedding itself — is
+verified for **MP4/MKV/M4A** by the addch round-trip proofs, while `rmch` strip
+is verified for **MP4/MKV**. See `FFMPEG_VERIFICATION.md` and the per-command
+support matrix in TOOLKIT_SCOPE.md §Container support.
 
 ### 10.3 Explicitly NOT guaranteed
 
@@ -502,7 +517,8 @@ The following are **out of contract** for round-tripping in all tiers:
   foreign media) re-importing into `addch`, which caps hours at 99.
 * **Byte-equality** of the text files — only chapter-list equality is
   guaranteed ([§10.1](#101-txt-semantic-round-trip-grammar-guaranteed)), and
-  media-level equality is only a Phase-2-verified requirement
+  media-level equality is verified only for the containers proven by the Phase
+  2 integration-test suite
   ([§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified)).
 * **Invalid-UTF-8 or non-UTF-8 byte sequences**: no guarantee is made that such
   content round-trips through the media layer (R1–R3), nor that it round-trips
@@ -541,21 +557,25 @@ Any implementation of this grammar MUST:
 11. Apply the duration check against the specific target video only at embed
     time.
 12. Emit titles verbatim with no escaping, and never invent escape syntax.
-13. Not treat the media/FFprobe round-trip as established behavior; it is a
-    Phase-2-verified contract requirement ([§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified)).
+13. Treat the media/FFprobe round-trip as established **only for containers
+    proven by the Phase 2 integration-test suite**; the proof lives in the
+    real-FFmpeg/FFprobe test coverage referenced by
+    `FFMPEG_VERIFICATION.md`, not in this grammar document.
 
 ---
 
 ## 12. Version Notes
 
-* **v0.1.0 (current):** this grammar is fully implemented by the `addch`
+* **v0.1.0 (historical):** this grammar was fully implemented by the `addch`
   parser, validator, and output formatting.
-* **v0.2.0 (approved):** the grammar is **unchanged**. `rmch` and `getch`
-  consume and (for `getch`) produce the same format. The `getch` producer
-  behavior in [§9](#9-canonical-output-getch--contract) and the media/FFprobe
-  round-trip contract in [§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified)
-  are **contract requirements to be implemented and verified in Phase 2**; they
-  are not claims about shipping behavior in this document.
+* **v0.2.0 (approved — Phase-2-verified):** the grammar is **unchanged**. `rmch`
+  and `getch` consume and (for `getch`) produce the same format. The `getch`
+  producer behavior in [§9](#9-canonical-output-getch--contract) and the
+  media/FFprobe round-trip contract in
+  [§10.2](#102-mediaffprobe-round-trip-contract-requirement--phase-2-verified)
+  were **contract requirements** at approval time and are now **verified
+  shipping behavior**, proven by the real-FFmpeg/FFprobe integration-test suite
+  (see `FFMPEG_VERIFICATION.md`).
 
 Any proposed change to the syntax (e.g., new timestamp forms, comment syntax,
 an escape language, multi-line titles, a non-ASCII delimiter) is a breaking

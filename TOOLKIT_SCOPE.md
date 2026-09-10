@@ -90,9 +90,19 @@ toolkit must:
 Each additional container requires its **own** real FFmpeg/FFprobe integration
 test before it may be added to the support matrix.
 
-This matrix applies **only to `addch`**. It does not yet claim `rmch` or `getch`
-compatibility with any container, because those commands are not implemented or
-verified.
+This matrix applies per command; `rmch` and `getch` are implemented and the
+empirically verified support is:
+
+| Command | Verified containers | QuickTime (MOV/M4V) |
+|---------|---------------------|---------------------|
+| `addch` (embed) | MP4, MKV, M4A/AAC | embeds, but excluded from batch discovery |
+| `rmch` (strip) | MP4, MKV | **not supported** — strip fails deterministically (FFmpeg 8.1.2 rc 183; the mov/ipod muxers reject the residual QuickTime text chapter track) |
+| `getch` (extract) | MP4, MKV | extracts |
+
+Batch discovery's filename allowlist is `.mp4`, `.mkv`, and `.m4a`; MOV/M4V
+stay outside it because the toolchain cannot round-trip them with `rmch`
+(Phase 8.5.3 evidence in `internal/fsutil/discovery.go` and
+`FFMPEG_VERIFICATION.md` "rmch strip verification").
 
 ---
 

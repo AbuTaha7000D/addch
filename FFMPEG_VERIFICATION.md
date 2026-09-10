@@ -21,6 +21,10 @@ The round-trip evidence lives in `integration_test.go`:
   them at millisecond-level semantic precision. See "Round-trip proof
   (Phase 2E)" below.
 
+`rmch` strip and `getch` extraction evidence is listed in their dedicated
+sections below ("rmch strip verification" and "Phase 6 — getch extraction
+verification").
+
 ## How to reproduce
 
 ```
@@ -108,6 +112,26 @@ M4A invariants verified via FFprobe:
   within 1 ms (`toleranceMs`).
 - The source M4A remains byte-identical after embedding (copy-out safety).
 
+## rmch strip verification
+
+`rmch` remuxes through FFmpeg's chapter-stripping filter (stream copy) and
+verifies the result with FFprobe. Its evidence lives in
+`cmd/rmch/integration_test.go` and `cmd/rmch/adversarial_test.go`.
+
+- **MP4 and MKV strip is verified:** chaptered fixtures re-probe with zero
+  chapters, the chapterless output keeps the media streams intact, input files
+  remain byte-identical, and no temporary metadata is leaked.
+- Same-path guards, output-mode handling, recursive/shallow batch behavior,
+  interruption (130/143), and failure-path cleanup are covered by the rmch
+  integration suite.
+- **QuickTime containers (MOV / M4V) are NOT strippable** and fail
+  deterministically under FFmpeg 8.1.2: rc 183, `Tag text incompatible with
+  output codec id '98314'` → `Could not write header` — the mov/ipod muxers
+  reject the residual QuickTime text chapter track. `addch` can embed and
+  `getch` can extract chapter text from MOV/M4V, but because `rmch` cannot
+  round-trip them, MOV/M4V are excluded from batch discovery (Phase 8.5.3
+  evidence, `internal/fsutil/discovery.go`).
+
 ## Round-trip proof (Phase 2E)
 
 `TestRoundTripParseEqualsProbe` (commit `236078f`) proves that, for every
@@ -186,8 +210,10 @@ are out of contract per `GRAMMAR.md` §10.3.
 
 - addch chapter embedding is empirically tested in MP4, MKV, and M4A/AAC only.
 - No claim is made for MP3, FLAC, OGG, or any other audio or video container.
-- No `getch` extraction round-trip validation exists yet.
-- No `rmch` validation exists yet.
+- MOV/M4V (QuickTime) were evaluated in Phase 8.5.3 and are deliberately left
+  outside batch discovery: `addch` embeds and `getch` extracts chapter text, but
+  `rmch` strip fails deterministically (rc 183; see "rmch strip verification"
+  above), so the toolchain cannot round-trip them.
 - These results do not expand the supported-container matrix beyond the
   empirically tested cases; untested containers remain unverified.
 
