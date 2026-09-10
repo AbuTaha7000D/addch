@@ -96,7 +96,10 @@ func addCandidate(candidates []Candidate, media string, sidecar string) []Candid
 // walked. Subdirectories are never treated as candidates, generated outputs
 // (filenames ending in "-chapters" or "-nochapters") are unconditionally
 // excluded, and the returned slice is sorted lexicographically by MediaPath so
-// execution order is deterministic across platforms.
+// execution order is deterministic across platforms. A recursive walk that hits
+// an entry-level traversal error (e.g. an unreadable subdirectory) aborts and
+// returns the error rather than yielding an apparently-complete partial
+// discovery.
 func FindCandidates(dir string, recursive bool) ([]Candidate, error) {
 	var paths []string
 	if err := walkMediaFiles(dir, recursive, func(p string) { paths = append(paths, p) }); err != nil {
@@ -115,7 +118,10 @@ func FindCandidates(dir string, recursive bool) ([]Candidate, error) {
 // only the files directly inside dir are inspected, when true the whole tree is
 // walked, subdirectories are never candidates, and generated outputs (filenames
 // ending in "-chapters" or "-nochapters") are unconditionally excluded. This is
-// the discovery entry point for rmch, which has no sidecar concept.
+// the discovery entry point for rmch, which has no sidecar concept. A recursive
+// walk that hits an entry-level traversal error (e.g. an unreadable
+// subdirectory) aborts and returns the error rather than yielding an
+// apparently-complete partial discovery.
 func FindMediaFiles(dir string, recursive bool) ([]string, error) {
 	var out []string
 	if err := walkMediaFiles(dir, recursive, func(p string) { out = append(out, p) }); err != nil {
@@ -131,7 +137,9 @@ func FindMediaFiles(dir string, recursive bool) ([]string, error) {
 // traversal is what keeps the two discovery flavors' ordering and filtering
 // identical. The root dir is validated up front so a missing or non-directory
 // batch root is reported as an error instead of silently succeeding with zero
-// results.
+// results. An entry-level traversal error during a recursive walk (e.g. an
+// unreadable subdirectory) aborts discovery and surfaces as an error, so an
+// incomplete traversal is never presented as a successful, complete one.
 func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
 	info, err := os.Stat(dir)
 	if err != nil {
@@ -155,18 +163,7 @@ func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
 			}
 			walkRoot = resolved
 		}
-		return filepath.WalkDir(walkRoot, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return nil
-			}
-			if d.IsDir() {
-				return nil
-			}
-			if candidateMedia(path) {
-				visit(path)
-			}
-			return nil
-		})
+		return filepath.WalkDir(walkRoot, walkVisit(visit))
 	}
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -182,6 +179,29 @@ func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
 		}
 	}
 	return nil
+}
+
+// walkVisit builds the recursive traversal callback used by walkMediaFiles. It
+// enforces the traversal-error policy: an error for an entry (for example an
+// unreadable subdirectory) aborts the walk by returning a descriptive error —
+// filepath.WalkDir stops and propagates it, so an incomplete traversal is
+// never reported to the caller as a complete discovery. Directories are not
+// candidates; every other regular, supported, non-generated file is forwarded
+// to visit. The error check precedes the directory-skip so a failed
+// directory is reported rather than glossed over.
+func walkVisit(visit func(path string)) fs.WalkDirFunc {
+	return func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return fmt.Errorf("cannot traverse %q: %w", path, err)
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if candidateMedia(path) {
+			visit(path)
+		}
+		return nil
+	}
 }
 
 // candidateMedia reports whether path is a regular file eligible for discovery:

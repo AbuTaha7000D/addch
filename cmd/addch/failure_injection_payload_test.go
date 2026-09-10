@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -310,5 +311,60 @@ func TestAddchBatchReadOnlyOutputDirContinues(t *testing.T) {
 	}
 	if got := countTempMetadata(); got != tempBefore {
 		t.Errorf("temp metadata leaked: before=%d after=%d", tempBefore, got)
+	}
+}
+
+// dirListable probes whether dir can actually be listed, so a chmod 000 that
+// was ineffective (privileged runners on Unix) does not fake a traversal error.
+func dirListable(dir string) bool {
+	_, err := os.ReadDir(dir)
+	return err == nil
+}
+
+// TestAddchBatchUnreadableSubdirAbortsDiscovery proves an entry-level
+// traversal error (an unreadable nested directory) aborts recursive discovery:
+// the batch must exit nonzero, name the failing subtree on stderr, and never
+// claim a complete run (no batch summary) or process even the readable half of
+// the tree — an incomplete traversal is never reported as success.
+func TestAddchBatchUnreadableSubdirAbortsDiscovery(t *testing.T) {
+	requireTools(t)
+	if runtime.GOOS == "windows" {
+		t.Skip("directory permission bits are not enforced on Windows")
+	}
+
+	dir := t.TempDir()
+	good := filepath.Join(dir, "good")
+	locked := filepath.Join(dir, "locked")
+	if err := os.Mkdir(good, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Mkdir(locked, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	goodVideo := makeNamedContainer(t, good, "a.mp4", "mp4", "8")
+	writeSidecar(t, goodVideo, batchChapters)
+	lockedVideo := makeNamedContainer(t, locked, "hidden.mp4", "mp4", "8")
+	writeSidecar(t, lockedVideo, batchChapters)
+
+	if err := os.Chmod(locked, 0o000); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = os.Chmod(locked, 0o755) }()
+	if !dirListable(dir) || dirListable(locked) {
+		t.Skip("chmod did not make the subdirectory unlistable (running as root or on Windows)")
+	}
+
+	out, errStr, code := runBatchForTest(dir, true, false)
+	if code != 1 {
+		t.Fatalf("expected exit 1 for a traversal error, got %d:\n%s\n%s", code, errStr, out)
+	}
+	if !strings.Contains(errStr, "cannot traverse") {
+		t.Errorf("stderr must name the failed traversal, got:\n%s", errStr)
+	}
+	if strings.Contains(out, "Total:") {
+		t.Errorf("an aborted discovery must not produce a batch summary:\n%s", out)
+	}
+	if _, err := os.Stat(fsutil.DefaultOutputPath(goodVideo)); err == nil {
+		t.Error("no media may be processed when discovery aborts")
 	}
 }
