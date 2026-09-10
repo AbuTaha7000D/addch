@@ -25,12 +25,14 @@ remain independent executables.
 (`getch` is ffprobe-only and never runs `ffmpeg`). Installing FFmpeg normally
 provides both. See [Requirements](#requirements) for your operating system.
 
-**Step 2 — Download the right binary**
+**Step 2 — Download and extract the right archive**
 
-Each release publishes `addch`, `rmch`, and `getch` binaries for every platform.
-Go to the [Releases page](https://github.com/AbuTaha7000D/addch/releases), open
-the latest release, and download the binaries that match your operating system
-and architecture (CPU type).
+Each release publishes `addch`, `rmch`, and `getch` for every platform, packed
+as archives: `tar.gz` on Linux and macOS, `zip` on Windows. Go to the
+[Releases page](https://github.com/AbuTaha7000D/addch/releases), open the latest
+release, and download the archive that matches your operating system and
+architecture (CPU type). Extract it and you get the binary named in the table
+below (plus `LICENSE` and `README.md` inside the archive).
 
 | Your operating system | `addch` | `rmch` | `getch` |
 | --------------------- | ------- | ------ | ------- |
@@ -48,14 +50,24 @@ Don't worry if you aren't sure what `amd64` or `arm64` means:
 - **arm64** is the CPU type used by Apple Silicon Macs (M1 and newer) and by many
   smaller/ARM devices such as the Raspberry Pi.
 
-If in doubt on a normal PC, choose the **`amd64`** file for your operating system.
+If in doubt on a normal PC, choose the **`amd64`** archive for your operating system.
 
 **Step 3 — Install and run the binary**
 
-On **Linux / macOS**, the downloaded file is a binary but does not yet have
-execute permission, so your system won't let you run it yet. Make it executable,
-then (optionally) move it into a directory on your `PATH` so you can run `addch`
-from anywhere. Open a terminal and run:
+On **Linux / macOS**, the downloaded archives contain the binaries. Extract
+them first:
+
+```sh
+# Extract the downloaded archives (each also contains LICENSE and README.md)
+tar -xzf addch-linux-amd64.tar.gz
+tar -xzf rmch-linux-amd64.tar.gz
+tar -xzf getch-linux-amd64.tar.gz
+```
+
+The extracted binary does not yet have execute permission, so your system won't
+let you run it yet. Make it executable, then (optionally) move it into a
+directory on your `PATH` so you can run `addch` from anywhere. Open a terminal
+and run:
 
 ```sh
 # Make the binary executable
@@ -75,12 +87,14 @@ getch --version
 If you skipped the `mv` step, run them from their download folders with `./addch`
 (etc.) instead of `addch`.
 
-On **Windows**, download the `.exe` files. You can run them by double-clicking
-them, but since they are command-line tools you will normally run them from a
-terminal (PowerShell or Command Prompt), for example:
+On **Windows**, the downloaded archive is a `.zip`. Extract it first
+(right-click → Extract All, or `Expand-Archive` in PowerShell); the `.exe`
+files will be inside. You can run them by double-clicking them, but since they
+are command-line tools you will normally run them from a terminal (PowerShell
+or Command Prompt), for example:
 
 ```powershell
-# Navigate to the folder where you downloaded the .exe files
+# Navigate to the folder where you extracted the .exe files
 cd C:\Users\YourName\Downloads
 .\addch-windows-amd64.exe --version
 ```
@@ -190,11 +204,12 @@ Install FFmpeg/FFprobe:
 
 ### Prebuilt binaries
 
-Download the release binaries for your platform from the
+Download the release archive for your platform from the
 [Releases page](https://github.com/AbuTaha7000D/addch/releases). You do **not**
-need to install Go to use the prebuilt binaries — just download the matching
-files for your system, make them executable (macOS/Linux), and run them. See the
-[Quick Start](#quick-start) for the full step-by-step.
+need to install Go to use the prebuilt binaries — just download the archive
+matching your system, extract it, make the extracted binary executable
+(macOS/Linux), and run it. See the [Quick Start](#quick-start) for the full
+step-by-step.
 
 | Platform | Binaries |
 | ------------------- | --------------------------------------------- |
@@ -209,7 +224,7 @@ The binaries are self-contained; you still need the external programs listed in
 [Requirements](#requirements).
 
 Each release also includes a `SHA256SUMS.txt` file so you can verify the checksum
-of any downloaded binary and confirm it was not corrupted in transit.
+of any downloaded archive and confirm it was not corrupted in transit.
 
 ### Build from source
 
@@ -331,8 +346,9 @@ Notes:
 - `--output` cannot be combined with `--dir`/`--recursive` batch mode.
 - All tools will not overwrite an existing output file unless you use
   `--overwrite`.
-- `getch` in single-file mode requires `--overwrite` together with `--output`,
-  because its default target is stdout (which cannot be overwritten).
+- `getch` in single-file mode writes to stdout by default; when `--output` is
+  used, an existing target is not overwritten unless `--overwrite` is also
+  given.
 - No tool ever overwrites your input video (or your chapter file).
 - Paths containing spaces or Unicode work everywhere; just quote them if your
   shell requires it (e.g. `addch chapters.txt "My Course.mp4"`).
