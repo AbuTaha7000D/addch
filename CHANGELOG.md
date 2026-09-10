@@ -2,18 +2,21 @@
 
 All notable changes to the addch chapter toolkit are documented in this file.
 
-## Unreleased
+## [v0.2.0] - 2026-09-10
+
+The v0.2.0 release ships the complete three-tool chapter toolkit: `addch`
+(chapter embedding, carried forward from v0.1.x), plus `rmch` and `getch`,
+with a unified CLI, batch processing, and an archive-based packaging pipeline
+for the documented six-platform matrix. It was released as `v0.2.0-rc.1`
+(see below) and finalized with an internal messaging refactor (see
+"v0.2.0 (final)").
 
 ### v0.2.0-rc.1
 
-The v0.2.0 release candidate ships the three-tool chapter toolkit: `addch`
-(chapter embedding, carried forward from v0.1.x), plus the new `rmch` and
-`getch` commands, with a unified CLI, batch processing, and an archive-based
-packaging pipeline for the documented six-platform matrix.
-
-> Note: an approved source refactor is staged in the working tree
-> (`cmd/*`, `internal/*`) but is **uncommitted**; it is intentionally absent
-> from this changelog and will ship with the v0.2.0 final release.
+Release candidate for v0.2.0, shipping the three-tool toolkit through the
+GoReleaser pipeline and superseded by the final entry below. The internal
+refactor described under "v0.2.0 (final)" was part of the same release; it is
+recorded there with its final commit reference.
 
 #### Added
 
@@ -73,3 +76,16 @@ packaging pipeline for the documented six-platform matrix.
   claims scoped per requirement and container (`bdcec4b`).
 - Quick Start rewritten for archive-based download/extract/run, and the
   `getch --output` / `--overwrite` note corrected (`1b3e6ac`).
+
+### v0.2.0 (final)
+
+- The full feature set of the `v0.2.0-rc.1` entry above (release candidate),
+  unchanged.
+- Final internal refactor (no change to CLI semantics, exit codes, or the
+  file-handling contract): `media.DependencyInfo.InstallHint` is parameterized
+  by invoking tool and purpose so each CLI ships
+  its own accurate dependency hint (`addch` — "to embed chapters"; `rmch` —
+  "to remove chapters"; `getch` keeps its FFprobe-only hint), and rmch FFmpeg
+  failure diagnostics use the accurate verb "strip" instead of "remux",
+  with matching tests and doc comments. Commit: `HASH4x` (to be replaced by
+  the user's final v0.2.0 release commit in 11.3).
