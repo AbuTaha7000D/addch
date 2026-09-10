@@ -138,7 +138,10 @@ func presentOrMissing(path string, v *Version) string {
 
 // InstallHint returns a human-readable message describing how to install
 // FFmpeg on the detected platform, including the exact command to run.
-func (di DependencyInfo) InstallHint() string {
+// toolName is the calling CLI (e.g. "addch", "rmch") and purpose describes
+// what the tool needs FFmpeg/FFprobe for (e.g. "to embed chapters",
+// "to remove chapters").
+func (di DependencyInfo) InstallHint(toolName, purpose string) string {
 	var missing []string
 	if di.FFmpegPath == "" {
 		missing = append(missing, "ffmpeg")
@@ -159,11 +162,11 @@ func (di DependencyInfo) InstallHint() string {
 		strings.Join(missing, " and "),
 		pluralWere(len(missing)),
 	))
-	b.WriteString("addch requires FFmpeg and FFprobe to embed chapters.\n\n")
+	b.WriteString(toolName + " requires FFmpeg and FFprobe " + purpose + ".\n\n")
 	if cmd != "" {
 		b.WriteString("To install on this system (" + prettyOS(osName) + "), run:\n\n")
 		b.WriteString("\t" + cmd + "\n\n")
-		b.WriteString("Also make sure ffmpeg and ffprobe are available in your PATH,\nthen run addch again.\n")
+		b.WriteString("Also make sure ffmpeg and ffprobe are available in your PATH,\nthen run " + toolName + " again.\n")
 	} else {
 		b.WriteString("There is no known one-line install command for " + prettyOS(osName) + ".\n")
 		b.WriteString("Please install FFmpeg from https://ffmpeg.org/download.html and ensure\nffmpeg and ffprobe are available in your PATH.\n")

@@ -32,24 +32,45 @@ func TestParseVersion(t *testing.T) {
 func TestInstallHintMessages(t *testing.T) {
 	// When everything is present, no hint is returned.
 	di := DependencyInfo{FFmpegPath: "/usr/bin/ffmpeg", FFprobePath: "/usr/bin/ffprobe"}
-	if h := di.InstallHint(); h != "" {
+	if h := di.InstallHint("addch", "to embed chapters"); h != "" {
 		t.Errorf("expected no hint when present, got: %q", h)
 	}
 
-	// When ffmpeg is missing, the hint mentions ffmpeg and a command.
+	// When ffmpeg is missing, the hint mentions ffmpeg, the tool name, and a command.
 	diMiss := DependencyInfo{FFprobePath: "/usr/bin/ffprobe"}
-	h := diMiss.InstallHint()
+	h := diMiss.InstallHint("addch", "to embed chapters")
 	if h == "" {
 		t.Fatal("expected an install hint")
 	}
 	if !strings.Contains(h, "ffmpeg") {
 		t.Errorf("hint should mention ffmpeg: %v", h)
 	}
+	if !strings.Contains(h, "addch") {
+		t.Errorf("hint should mention the calling tool name: %v", h)
+	}
+	if !strings.Contains(h, "to embed chapters") {
+		t.Errorf("hint should mention the purpose: %v", h)
+	}
 
 	// Both missing -> the message says "ffmpeg and ffprobe were".
-	bothMissing := (DependencyInfo{}).InstallHint()
+	bothMissing := (DependencyInfo{}).InstallHint("addch", "to embed chapters")
 	if !strings.Contains(bothMissing, "were") {
 		t.Errorf("multiple-missing message should use 'were': %v", bothMissing)
+	}
+
+	// rmch gets its own name and purpose in the hint.
+	rmchHint := (DependencyInfo{}).InstallHint("rmch", "to remove chapters")
+	if !strings.Contains(rmchHint, "rmch") {
+		t.Errorf("rmch hint should mention rmch: %v", rmchHint)
+	}
+	if !strings.Contains(rmchHint, "to remove chapters") {
+		t.Errorf("rmch hint should mention chapter removal purpose: %v", rmchHint)
+	}
+	if strings.Contains(rmchHint, "addch") {
+		t.Errorf("rmch hint must not mention addch: %v", rmchHint)
+	}
+	if !strings.Contains(rmchHint, "then run rmch again") {
+		t.Errorf("rmch hint should say 'then run rmch again': %v", rmchHint)
 	}
 }
 

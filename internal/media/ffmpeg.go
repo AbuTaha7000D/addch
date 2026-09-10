@@ -149,6 +149,7 @@ type RemuxProcess struct {
 	output *strings.Builder
 	errC   chan error
 	begin  sync.Once
+	action string // human-readable verb for error messages (e.g. "remux", "strip")
 }
 
 // NewRemuxProcess wraps a command so its stdout and stderr are captured into a
@@ -172,6 +173,7 @@ func NewRemuxProcess(cmd *exec.Cmd) *RemuxProcess {
 func StartRemux(inputVideo, inputMeta, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
 	cmd := exec.Command("ffmpeg", BuildFFmpegArgs(inputVideo, inputMeta, output, outputExt, overwrite)...)
 	rp := NewRemuxProcess(cmd)
+	rp.action = "remux"
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
 	}
@@ -184,6 +186,7 @@ func StartRemux(inputVideo, inputMeta, output string, outputExt string, overwrit
 func StartStrip(inputVideo, output string, outputExt string, overwrite bool) (*RemuxProcess, error) {
 	cmd := exec.Command("ffmpeg", BuildStripArgs(inputVideo, output, outputExt, overwrite)...)
 	rp := NewRemuxProcess(cmd)
+	rp.action = "strip"
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("FFmpeg failed to start: %w", err)
 	}
@@ -205,7 +208,7 @@ func (r *RemuxProcess) startReaping() {
 			if msg == "" {
 				msg = werr.Error()
 			}
-			r.errC <- fmt.Errorf("FFmpeg failed to remux the video: %s", msg)
+			r.errC <- fmt.Errorf("FFmpeg failed to %s the video: %s", r.action, msg)
 		}()
 	})
 }

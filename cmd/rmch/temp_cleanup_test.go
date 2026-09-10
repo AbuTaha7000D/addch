@@ -101,7 +101,7 @@ func TestRmchTempCleanupFailedStrip(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("expected a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}
-	if !strings.Contains(errBuf.String(), "FFmpeg failed to remux the video") {
+	if !strings.Contains(errBuf.String(), "FFmpeg failed to strip the video") {
 		t.Errorf("expected the strip failure diagnostic, got:\n%s", errBuf.String())
 	}
 	requireTempClean(t, before, dir)

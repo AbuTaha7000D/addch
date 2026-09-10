@@ -51,7 +51,7 @@ var generatedSuffixes = []string{"-chapters", "-nochapters"}
 //	video-nochapters.mkv      -> true
 //	lecture.01-chapters.mp4   -> true
 //	my-course.mp4             -> false
-//	طلاب-لا فصول.mp4          -> false
+//	unicode-nochapters.mp4    -> false
 func IsGeneratedOutput(path string) bool {
 	name := strings.ToLower(filepath.Base(path))
 	stem := strings.TrimSuffix(name, strings.ToLower(filepath.Ext(name)))

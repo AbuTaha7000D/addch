@@ -305,6 +305,7 @@ func TestRemuxErrorIncludesFFmpegDiagnostic(t *testing.T) {
 	}
 	cmd := exec.Command("sh", "-c", `printf "custom diagnostic" >&2; exit 234`)
 	rp := NewRemuxProcess(cmd)
+	rp.action = "remux"
 	if err := cmd.Start(); err != nil {
 		t.Fatalf("start substitute command: %v", err)
 	}

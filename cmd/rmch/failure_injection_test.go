@@ -176,7 +176,7 @@ func TestRmchFakeFFmpegStripFailure(t *testing.T) {
 	if code == 0 {
 		t.Fatalf("expected nonzero exit with a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}
-	if !strings.Contains(errBuf.String(), "FFmpeg failed to remux the video: simulated remux failure") {
+	if !strings.Contains(errBuf.String(), "FFmpeg failed to strip the video: simulated remux failure") {
 		t.Errorf("the FFmpeg diagnostic must reach the caller, got:\n%s", errBuf.String())
 	}
 	if _, err := os.Stat(fsutil.DefaultNoChaptersOutputPath(video)); err == nil {

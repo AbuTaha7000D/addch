@@ -62,7 +62,7 @@ func runCheck(stdout, stderr io.Writer) int {
 		return 0
 	}
 	fmt.Fprintln(stdout)
-	fmt.Fprint(stderr, di.InstallHint())
+	fmt.Fprint(stderr, di.InstallHint("addch", "to embed chapters"))
 	return 1
 }
 
@@ -76,7 +76,7 @@ func runBatch(pa *parsedArgs, stdout, stderr io.Writer) int {
 	// 1. Dependency check (fail fast, no changes yet).
 	di := media.CheckDependencies()
 	if !di.Ready() {
-		fmt.Fprint(stderr, di.InstallHint())
+		fmt.Fprint(stderr, di.InstallHint("addch", "to embed chapters"))
 		return 1
 	}
 	fmt.Fprintln(stdout, "✓ Dependencies found")
@@ -243,7 +243,7 @@ func runEmbed(pa *parsedArgs, stdout, stderr io.Writer) int {
 	// 1. Dependency check (fail fast, no modifications yet).
 	di := media.CheckDependencies()
 	if !di.Ready() {
-		fmt.Fprint(stderr, di.InstallHint())
+		fmt.Fprint(stderr, di.InstallHint("addch", "to embed chapters"))
 		return 1
 	}
 	fmt.Fprintln(stdout, "✓ Dependencies found")
