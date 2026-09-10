@@ -23,47 +23,22 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
-      - name: Build
-        run: |
-          LDFLAGS="-s -w -X main.version=${{ steps.version.outputs.VERSION }}"
-          mkdir -p dist
-          GOOS=linux   GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/addch-linux-amd64 ./cmd/addch
-          GOOS=linux   GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/addch-linux-arm64 ./cmd/addch
-          GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/addch-darwin-amd64 ./cmd/addch
-          GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/addch-darwin-arm64 ./cmd/addch
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/addch-windows-amd64.exe ./cmd/addch
-          GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/addch-windows-arm64.exe ./cmd/addch
-          GOOS=linux   GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rmch-linux-amd64 ./cmd/rmch
-          GOOS=linux   GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/rmch-linux-arm64 ./cmd/rmch
-          GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rmch-darwin-amd64 ./cmd/rmch
-          GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/rmch-darwin-arm64 ./cmd/rmch
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/rmch-windows-amd64.exe ./cmd/rmch
-          GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/rmch-windows-arm64.exe ./cmd/rmch
-          GOOS=linux   GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/getch-linux-amd64 ./cmd/getch
-          GOOS=linux   GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/getch-linux-arm64 ./cmd/getch
-          GOOS=darwin  GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/getch-darwin-amd64 ./cmd/getch
-          GOOS=darwin  GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/getch-darwin-arm64 ./cmd/getch
-          GOOS=windows GOARCH=amd64 go build -ldflags "$LDFLAGS" -o dist/getch-windows-amd64.exe ./cmd/getch
-          GOOS=windows GOARCH=arm64 go build -ldflags "$LDFLAGS" -o dist/getch-windows-arm64.exe ./cmd/getch
-
       - name: Verify version
         run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
           for t in addch rmch getch; do
-            got="$(./dist/${t}-linux-amd64 --version)"
-            want="${t} ${{ steps.version.outputs.VERSION }}"
+            go build -ldflags "-s -w -X main.version=$VERSION" -o $t-probe ./cmd/$t
+            got="$(./$t-probe --version)"
+            want="$t $VERSION"
             if [ "$got" != "$want" ]; then
-              echo "::error::version mismatch for ${t}: got '$got', want '$want'"
+              echo "::error::version mismatch for $t: got '$got', want '$want'"
               exit 1
             fi
+            rm -f $t-probe
           done
-          echo "linux/amd64 binaries report version: ${{ steps.version.outputs.VERSION }}"
+          echo "probe binaries report version: $VERSION"
 
-      - name: Create checksums
-        working-directory: dist
-        run: sha256sum addch-* rmch-* getch-* > SHA256SUMS.txt
-
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Release
+        uses: goreleaser/goreleaser-action@v6
         with:
-          files: dist/*
-          generate_release_notes: true
+          args: release --clean
