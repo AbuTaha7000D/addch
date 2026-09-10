@@ -19,17 +19,20 @@ type Candidate struct {
 }
 
 // supportedMediaExtensions are the containers empirically verified to carry
-// embedded chapters via stream copy without re-encoding.
+// embedded chapters via stream copy without re-encoding. .mov and .m4v are
+// deliberately absent: addch embeds chapters into both (verified with real
+// FFmpeg/FFprobe, Phase 8.5.3), but rmch cannot strip them because the mov and
+// ipod muxers reject the residual QuickTime text chapter track with "Tag text
+// incompatible with output codec id '98314'" (rc 183), so a chaptered file
+// never round-trips through the removal path.
 var supportedMediaExtensions = map[string]bool{
 	".mp4": true,
-	".m4v": true,
-	".mov": true,
 	".mkv": true,
 	".m4a": true,
 }
 
 // IsSupportedMediaExt reports whether ext is one of the supported media
-// extensions. The match is case-insensitive, so ".MP4", ".Mkv", and ".MOV" are
+// extensions. The match is case-insensitive, so ".MP4", ".Mkv", and ".M4A" are
 // all accepted.
 func IsSupportedMediaExt(ext string) bool {
 	return supportedMediaExtensions[strings.ToLower(ext)]

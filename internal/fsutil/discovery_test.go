@@ -20,8 +20,8 @@ func TestIsSupportedMediaExt(t *testing.T) {
 	}{
 		{".mp4", true},
 		{".MP4", true},
-		{".m4v", true},
-		{".MOV", true},
+		{".m4v", false},
+		{".MOV", false},
 		{".mkv", true},
 		{".m4a", true},
 		{".avi", false},
@@ -120,7 +120,7 @@ func TestFindCandidatesRecursive(t *testing.T) {
 	if err := os.Mkdir(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(nested, "deep.mov"))
+	writeFile(t, filepath.Join(nested, "deep.mkv"))
 	writeFile(t, filepath.Join(nested, "deep.txt"))
 	deep := filepath.Join(nested, "deeper")
 	if err := os.Mkdir(deep, 0o755); err != nil {
@@ -147,7 +147,7 @@ func TestFindCandidatesGeneratedExclusion(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "vid-chapters.txt"))
 	writeFile(t, filepath.Join(dir, "vid-nochapters.mkv"))
 	writeFile(t, filepath.Join(dir, "vid-nochapters.txt"))
-	writeFile(t, filepath.Join(dir, "lecture.01-chapters.m4v"))
+	writeFile(t, filepath.Join(dir, "lecture.01-chapters.m4a"))
 	writeFile(t, filepath.Join(dir, "lecture.01-chapters.txt"))
 	// A normal file must survive.
 	writeFile(t, filepath.Join(dir, "keep.mp4"))
@@ -344,7 +344,7 @@ func TestFindMediaFilesRecursive(t *testing.T) {
 	if err := os.Mkdir(nested, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, filepath.Join(nested, "deep.mov"))
+	writeFile(t, filepath.Join(nested, "deep.mkv"))
 	deep := filepath.Join(nested, "deeper")
 	if err := os.Mkdir(deep, 0o755); err != nil {
 		t.Fatal(err)
@@ -361,7 +361,7 @@ func TestFindMediaFilesRecursive(t *testing.T) {
 		t.Fatalf("got %d media files, want 3: %+v", len(files), files)
 	}
 	want := []string{
-		filepath.Join(nested, "deep.mov"),
+		filepath.Join(nested, "deep.mkv"),
 		filepath.Join(deep, "deepest.m4a"),
 		filepath.Join(dir, "top.mp4"),
 	}
@@ -376,7 +376,7 @@ func TestFindMediaFilesGeneratedExclusion(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, filepath.Join(dir, "vid-chapters.mp4"))
 	writeFile(t, filepath.Join(dir, "vid-nochapters.mkv"))
-	writeFile(t, filepath.Join(dir, "lecture.01-chapters.m4v"))
+	writeFile(t, filepath.Join(dir, "lecture.01-chapters.m4a"))
 	// A normal file must survive.
 	writeFile(t, filepath.Join(dir, "keep.mp4"))
 
