@@ -1,0 +1,85 @@
+# GoReleaser configuration for the addch chapter toolkit.
+# Builds addch, rmch, and getch for the documented 6-platform matrix and
+# publishes a single dash-style archive (tar.gz and zip) per platform/tool,
+# a SHA256SUMS.txt over every artifact, and changelog from git summaries.
+
+version: 2
+
+project_name: addch
+
+builds:
+  - id: addch
+    main: ./cmd/addch
+    binary: addch-{{ .Os }}-{{ .Arch }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w -X main.version=v{{ .Version }}"
+
+  - id: rmch
+    main: ./cmd/rmch
+    binary: rmch-{{ .Os }}-{{ .Arch }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w -X main.version=v{{ .Version }}"
+
+  - id: getch
+    main: ./cmd/getch
+    binary: getch-{{ .Os }}-{{ .Arch }}
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - "-s -w -X main.version=v{{ .Version }}"
+
+archives:
+  - id: archives-addch
+    ids:
+      - addch
+    formats:
+      - tar.gz
+      - zip
+    name_template: "{{ .Binary }}"
+
+  - id: archives-rmch
+    ids:
+      - rmch
+    formats:
+      - tar.gz
+      - zip
+    name_template: "{{ .Binary }}"
+
+  - id: archives-getch
+    ids:
+      - getch
+    formats:
+      - tar.gz
+      - zip
+    name_template: "{{ .Binary }}"
+
+checksum:
+  name_template: "SHA256SUMS.txt"
+
+changelog:
+  use: git
