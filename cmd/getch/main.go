@@ -104,7 +104,14 @@ func runExtract(pa *parsedArgs, stdout, stderr io.Writer) int {
 		if len(chs) == 0 {
 			return 0
 		}
-		chapters.Write(stdout, chs)
+		// A failed writer (e.g. a closed pipe or full disk) must surface as an
+		// error: the diagnostic goes to stderr, stdout receives nothing more,
+		// and the exit code is nonzero so consumers cannot mistake the partial
+		// output for success.
+		if err := chapters.Write(stdout, chs); err != nil {
+			fmt.Fprintf(stderr, "Error: %v\n", err)
+			return 1
+		}
 		return 0
 	}
 
