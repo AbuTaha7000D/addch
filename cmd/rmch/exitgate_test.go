@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/abutaha/addch/internal/media"
 )
 
 // exePath returns the path of the currently running test binary, used to
@@ -42,14 +45,22 @@ func waitWithTimeout(t *testing.T, cmd *exec.Cmd, timeout time.Duration) error {
 	}
 }
 
-// nochaptersOutputs returns any *-nochapters* files under dir (partial output
-// would be removed on interruption, so any survivor is a leak).
-func nochaptersOutputs(t *testing.T, dir string) []string {
+// partialNoChaptersOutputs returns any *-nochapters* files under dir that are
+// not valid, complete chapter-stripped outputs. A strip interrupted mid-write
+// leaves a truncated/broken file, which ffprobe cannot fully read, so such a
+// survivor is a genuine leak. A strip that finished before the signal lands
+// leaves a complete zero-chapter output that ffprobe reads cleanly; completed
+// work surviving an interrupt is legitimate (same contract as getch's
+// exit-gate batch, where completed sidecars are not leaks).
+func partialNoChaptersOutputs(t *testing.T, dir string) []string {
 	t.Helper()
 	var found []string
 	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, err error) error {
-		if err == nil && !d.IsDir() && strings.Contains(filepath.Base(path), "-nochapters") {
-			found = append(found, path)
+		if err != nil || d.IsDir() || !strings.Contains(filepath.Base(path), "-nochapters") {
+			return nil
+		}
+		if err := media.VerifyNoChapters(path); err != nil {
+			found = append(found, fmt.Sprintf("%s (%v)", path, err))
 		}
 		return nil
 	})
@@ -59,7 +70,7 @@ func nochaptersOutputs(t *testing.T, dir string) []string {
 // runSignalTest spawns the REAL rmch binary (via the TestMain re-exec hook),
 // waits for it to finish startup (handshake on its first output line), then
 // interrupts it mid-batch with sig and asserts the child reaps itself with
-// wantCode and leaves no partial -nochapters output and no temp litter.
+// wantCode, leaves no incomplete -nochapters output and no temp litter.
 func runSignalTest(t *testing.T, sig syscall.Signal, wantCode int) {
 	t.Helper()
 	requireTools(t)
@@ -68,7 +79,10 @@ func runSignalTest(t *testing.T, sig syscall.Signal, wantCode int) {
 	}
 
 	// Several chaptered candidates keep the batch running past the signal, so
-	// the child cannot finish its whole run before the signal lands.
+	// the child cannot finish its whole run before the signal lands and at
+	// least some items are cancelled. Items whose strip completes before the
+	// signal (a fast machine can finish one in the 250ms window) legitimately
+	// keep their output, so only incomplete survivors are leaks.
 	dir := t.TempDir()
 	for _, name := range []string{"one.mp4", "two.mp4", "three.mp4", "four.mp4", "five.mp4"} {
 		makeChapteredFixture(t, dir, name, "mp4", "10")
@@ -150,8 +164,8 @@ func runSignalTest(t *testing.T, sig syscall.Signal, wantCode int) {
 			code, wantCode, strings.Join(stdout, "\n"), errBuf.String())
 	}
 
-	if leaks := nochaptersOutputs(t, dir); len(leaks) != 0 {
-		t.Errorf("partial -nochapters outputs left after interrupt: %v", leaks)
+	if leaks := partialNoChaptersOutputs(t, dir); len(leaks) != 0 {
+		t.Errorf("incomplete -nochapters outputs left after interrupt: %v", leaks)
 	}
 	if got := countTempMetadata(); got != tempBefore {
 		t.Errorf("temp metadata leaked after interrupt: before=%d after=%d", tempBefore, got)
