@@ -216,17 +216,15 @@ of any downloaded binary and confirm it was not corrupted in transit.
 If you prefer to build the binaries yourself (requires Go):
 
 ```sh
-make build        # produces ./addch
-make install      # go install
+make build        # produces ./addch ./rmch ./getch
+make install      # go install all three
 ```
 
-`make build` and `make install` target the `addch` binary; install the others
-directly:
+`make build` and `make install` build and install all three binaries (`addch`,
+`rmch`, and `getch`). To build or install a single one individually:
 
 ```sh
 go build -o rmch ./cmd/rmch
-go build -o getch ./cmd/getch
-go install ./cmd/rmch
 go install ./cmd/getch
 ```
 
