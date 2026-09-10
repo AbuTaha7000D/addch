@@ -87,5 +87,4 @@ recorded there with its final commit reference.
   its own accurate dependency hint (`addch` — "to embed chapters"; `rmch` —
   "to remove chapters"; `getch` keeps its FFprobe-only hint), and rmch FFmpeg
   failure diagnostics use the accurate verb "strip" instead of "remux",
-  with matching tests and doc comments. Commit: `HASH4x` (to be replaced by
-  the user's final v0.2.0 release commit in 11.3).
+  with matching tests and doc comments. Commit: `eaef42e`.
