@@ -16,11 +16,24 @@ import (
 // ffprobe, so the fakes here drive the probe path end to end; the "ok" role is
 // a positive control proving the fake mechanism itself can succeed.
 
+// exeExt is the platform executable suffix used for PATH-shim entries (".exe"
+// on Windows, "" elsewhere), so tool lookup and launch resolve on every OS.
+var exeExt = func() string {
+	if runtime.GOOS == "windows" {
+		return ".exe"
+	}
+	return ""
+}()
+
 // maybeRunFakeTool lets the test binary masquerade as a fake ffmpeg/ffprobe
 // when it is re-executed from a PATH shim under the matching name. It is called
 // from TestMain ahead of the CLI re-exec hook.
 func maybeRunFakeTool() bool {
-	switch strings.ToLower(filepath.Base(os.Args[0])) {
+	base := strings.ToLower(filepath.Base(os.Args[0]))
+	if runtime.GOOS == "windows" {
+		base = strings.TrimSuffix(base, ".exe")
+	}
+	switch base {
 	case "ffmpeg":
 		if role := os.Getenv("FAKE_FFMPEG"); role != "" {
 			fakeFFmpeg(role)
@@ -84,13 +97,13 @@ func fakeToolShim(t *testing.T, fakeTool string, realTools ...string) string {
 	if err != nil {
 		t.Fatalf("locate test binary for fake %s: %v", fakeTool, err)
 	}
-	getchSymlinkForTest(t, exe, filepath.Join(dir, fakeTool))
+	getchSymlinkForTest(t, exe, filepath.Join(dir, fakeTool+exeExt))
 	for _, tool := range realTools {
 		real, err := exec.LookPath(tool)
 		if err != nil {
 			t.Fatalf("could not locate real %s for PATH shim: %v", tool, err)
 		}
-		getchSymlinkForTest(t, real, filepath.Join(dir, tool))
+		getchSymlinkForTest(t, real, filepath.Join(dir, tool+exeExt))
 	}
 	return dir
 }

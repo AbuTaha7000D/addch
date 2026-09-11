@@ -304,7 +304,13 @@ func TestWriteFileAtomic(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if perm := fi.Mode().Perm(); perm&0o777 != 0o644 {
+		if runtime.GOOS == "windows" {
+			// Windows has no POSIX permission bits: a writable file reports mode
+			// 0666 rather than 0644, so only the regular-file contract is pinned.
+			if !fi.Mode().IsRegular() {
+				t.Errorf("expected a regular readable file, mode = %v", fi.Mode())
+			}
+		} else if perm := fi.Mode().Perm(); perm&0o777 != 0o644 {
 			t.Errorf("mode = %o, want 644", perm)
 		}
 	})

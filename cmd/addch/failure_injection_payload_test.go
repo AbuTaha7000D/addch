@@ -82,6 +82,7 @@ func TestAddchInvalidPayloads(t *testing.T) {
 // the temp metadata directory.
 func TestAddchBatchCorruptSiblingContinues(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	good := makeNamedContainer(t, dir, "good.mp4", "mp4", "8")

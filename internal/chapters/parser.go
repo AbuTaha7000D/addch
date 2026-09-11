@@ -23,6 +23,9 @@ func ParseFile(path string) ([]Chapter, error) {
 		return nil, fmt.Errorf("cannot open chapters file %q: %w", path, err)
 	}
 	defer f.Close()
+	if fi, err := f.Stat(); err == nil && fi.IsDir() {
+		return nil, fmt.Errorf("chapters file %q is a directory, not a chapters file", path)
+	}
 	return Parse(f)
 }
 

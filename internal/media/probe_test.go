@@ -69,6 +69,7 @@ func TestTimebaseToMillis(t *testing.T) {
 		{2000000000, "1/1000000000", 2000, true}, // MKV ns -> ms
 		{60500000000, "1/1000000000", 60500, true},
 		{1000000, "1/1000000", 1000, true}, // us -> ms
+		{38387, "1/12800", 2999, true},     // lossy 1/12800 movie timescale rounds to the exact ms
 		{0, "garbage", 0, false},
 		{5, "1/0", 0, false},
 	}

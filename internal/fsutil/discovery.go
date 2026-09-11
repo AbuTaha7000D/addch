@@ -195,7 +195,7 @@ func walkMediaFiles(dir string, recursive bool, visit func(path string)) error {
 func walkVisit(visit func(path string)) fs.WalkDirFunc {
 	return func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
-			return fmt.Errorf("cannot traverse %q: %w", path, err)
+			return fmt.Errorf("cannot traverse \"%s\": %w", path, err)
 		}
 		if d.IsDir() {
 			return nil

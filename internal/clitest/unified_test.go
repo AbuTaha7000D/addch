@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -30,6 +31,11 @@ func repoRoot(t *testing.T) string {
 func buildTool(t *testing.T, tool string) string {
 	t.Helper()
 	bin := filepath.Join(t.TempDir(), tool)
+	// On Windows "go build" produces "<tool>.exe", so the returned path must
+	// carry the extension for exec.LookPath to resolve it.
+	if runtime.GOOS == "windows" {
+		bin += ".exe"
+	}
 	cmd := exec.Command("go", "build", "-o", bin, "./cmd/"+tool)
 	cmd.Dir = repoRoot(t)
 	if out, err := cmd.CombinedOutput(); err != nil {

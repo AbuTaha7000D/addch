@@ -16,10 +16,13 @@ import (
 const hostileMediaName = "  cafe\u00e9\u0301 \u30e2\u30b8 \u0645\u0631\u062d\u0628\u0627 \U0001f3ac \u0410.   .mp4"
 
 // hostileRoot returns a batch/work directory whose own path contains Unicode
-// scripts, emoji, and spaces.
+// scripts, emoji, and spaces. The directory name deliberately avoids a trailing
+// space: Windows cannot reliably address a trailing-space component in the
+// middle of a path, so such a name would exercise a platform limitation of the
+// fixture rather than the toolkit's path handling.
 func hostileRoot(t *testing.T) string {
 	t.Helper()
-	root := filepath.Join(t.TempDir(), "فيديوهات \u30e2\u30b8 \u0639\u0631\u0628\u064a\u0629 \U0001f3ac movies ")
+	root := filepath.Join(t.TempDir(), "فيديوهات \u30e2\u30b8 \u0639\u0631\u0628\u064a\u0629 \U0001f3ac movies")
 	if err := os.MkdirAll(root, 0o755); err != nil {
 		t.Fatalf("create hostile root: %v", err)
 	}
@@ -57,6 +60,7 @@ func readBytes(t *testing.T, path string) []byte {
 
 func TestAddchAdversarialHostileNameEmbed(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := hostileRoot(t)
 	video := makeTestVideo(t, dir, "10")

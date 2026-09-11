@@ -40,7 +40,7 @@ type probeFormat struct {
 func GetVideoDurationMs(videoPath string) (int64, error) {
 	out, err := ProbeJSON("-show_format", videoPath)
 	if err != nil {
-		return 0, fmt.Errorf("could not read video %q: %v — is it a valid video file?", videoPath, err)
+		return 0, fmt.Errorf("could not read video \"%s\": %v — is it a valid video file?", videoPath, err)
 	}
 	var pf probeFormat
 	if err := json.Unmarshal(out, &pf); err != nil {
@@ -152,6 +152,11 @@ const ToleranceMs = 1
 // TimebaseToMillis converts a raw clock value to milliseconds given an
 // FFmpeg time_base string such as "1/1000" or "1/1000000000". It returns false
 // if the time_base cannot be parsed. Formula: ms = value * 1000 / denom.
+// The result is rounded to the nearest millisecond (rather than truncated)
+// because FFmpeg writes timestamps with round-to-nearest when a non-millisecond
+// time_base is in use (for example the 1/12800 movie timescale some encoders
+// choose), so reading must round identically to recover the original value.
+// Exact divisions (1/1000, 1/1000000000, ...) are unaffected by the rounding.
 func TimebaseToMillis(value int64, tb string) (int64, bool) {
 	parts := strings.SplitN(tb, "/", 2)
 	if len(parts) != 2 {
@@ -162,8 +167,8 @@ func TimebaseToMillis(value int64, tb string) (int64, bool) {
 	if err1 != nil || err2 != nil || num <= 0 || den <= 0 {
 		return 0, false
 	}
-	// ms = value * (num/den) * 1000 = value * num * 1000 / den
-	return (value * num * 1000) / den, true
+	// ms = value * (num/den) * 1000 = value * num * 1000 / den, rounded.
+	return (value*num*1000 + den/2) / den, true
 }
 
 // VerifyChapters uses ffprobe to confirm that the output file contains exactly
