@@ -17,6 +17,7 @@ import (
 // empty directory at the output path).
 func TestRmchAdversarialOutputDirectory(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	t.Run("single: directory at output path refused without overwrite", func(t *testing.T) {
 		dir := t.TempDir()

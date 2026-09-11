@@ -152,9 +152,9 @@ func TestAddchInputIntegrityFailedRemux(t *testing.T) {
 	inputs := snapshotFiles(t, video, chaptersFile)
 
 	t.Setenv("FAKE_FFMPEG", "fail")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 	var out, errBuf bytes.Buffer
-	code := runAddchWithPath(t, []string{chaptersFile, video}, shim, &out, &errBuf)
+	code := runAddchFakeTool(t, []string{chaptersFile, video}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected nonzero exit with a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}
@@ -178,9 +178,9 @@ func TestAddchInputIntegrityVerificationFailure(t *testing.T) {
 	inputs := snapshotFiles(t, video, chaptersFile)
 
 	t.Setenv("FAKE_FFMPEG", "garbage")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 	var out, errBuf bytes.Buffer
-	code := runAddchWithPath(t, []string{chaptersFile, video}, shim, &out, &errBuf)
+	code := runAddchFakeTool(t, []string{chaptersFile, video}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected verification to reject the lying ffmpeg\nstdout:\n%s", out.String())
 	}

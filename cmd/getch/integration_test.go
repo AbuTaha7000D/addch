@@ -190,6 +190,7 @@ func TestExtractMKV(t *testing.T) {
 // temp metadata leaks.
 func extractContainer(t *testing.T, container string) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	input := makeChapteredFixture(t, dir, "chaptered."+container, container, "10")
@@ -446,6 +447,7 @@ func TestExtractOutputRefusalAndOverwrite(t *testing.T) {
 
 func TestExtractOutputSamePath(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	input := makeChapteredFixture(t, dir, "chaptered.mp4", "mp4", "10")

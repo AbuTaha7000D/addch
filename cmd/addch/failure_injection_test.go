@@ -119,9 +119,11 @@ func fakeFFprobe(role string) {
 }
 
 // fakeToolShim builds a PATH directory that exposes fakeTool as a symlink to
-// the test binary itself (which dispatches via maybeRunFakeTool) plus the
-// requested real tools, and returns the directory.
-func fakeToolShim(t *testing.T, fakeTool string, realTools ...string) string {
+// the test binary itself (which dispatches via maybeRunFakeTool) and returns
+// the directory. It deliberately contains no real tool aliases: real tools are
+// resolved from the normal environment PATH via runAddchFakeTool, so the fake
+// alias can never shadow or be shadowed by a real binary.
+func fakeToolShim(t *testing.T, fakeTool string) string {
 	t.Helper()
 	dir := t.TempDir()
 	exe, err := os.Executable()
@@ -129,13 +131,6 @@ func fakeToolShim(t *testing.T, fakeTool string, realTools ...string) string {
 		t.Fatalf("locate test binary for fake %s: %v", fakeTool, err)
 	}
 	symlinkForTest(t, exe, filepath.Join(dir, fakeTool+exeExt))
-	for _, tool := range realTools {
-		real, err := exec.LookPath(tool)
-		if err != nil {
-			t.Fatalf("could not locate real %s for PATH shim: %v", tool, err)
-		}
-		symlinkForTest(t, real, filepath.Join(dir, tool+exeExt))
-	}
 	return dir
 }
 
@@ -161,9 +156,9 @@ func TestAddchFakeFFprobeRejections(t *testing.T) {
 			os.WriteFile(chaptersFile, []byte("00:00:00 A\n00:00:05 B\n"), 0o644)
 
 			t.Setenv("FAKE_FFPROBE", c.role)
-			shim := fakeToolShim(t, "ffprobe", "ffmpeg")
+			shim := fakeToolShim(t, "ffprobe")
 			var out, errBuf bytes.Buffer
-			code := runAddchWithPath(t, []string{chaptersFile, video}, shim, &out, &errBuf)
+			code := runAddchFakeTool(t, []string{chaptersFile, video}, shim, &out, &errBuf)
 			if code == 0 {
 				t.Fatalf("expected nonzero exit with a broken fake ffprobe\nstdout:\n%s", out.String())
 			}
@@ -193,11 +188,11 @@ func TestAddchFakeFFmpegRemuxFailure(t *testing.T) {
 
 	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 	t.Setenv("FAKE_FFMPEG", "fail")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 
 	tempBefore := countTempMetadata()
 	var out, errBuf bytes.Buffer
-	code := runAddchWithPath(t, []string{chaptersFile, video}, shim, &out, &errBuf)
+	code := runAddchFakeTool(t, []string{chaptersFile, video}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected nonzero exit with a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}
@@ -225,11 +220,11 @@ func TestAddchFakeFFmpegGarbageOutputFailsVerification(t *testing.T) {
 
 	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 	t.Setenv("FAKE_FFMPEG", "garbage")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 
 	tempBefore := countTempMetadata()
 	var out, errBuf bytes.Buffer
-	code := runAddchWithPath(t, []string{chaptersFile, video}, shim, &out, &errBuf)
+	code := runAddchFakeTool(t, []string{chaptersFile, video}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected verification to reject the lying FFmpeg's output\nstdout:\n%s", out.String())
 	}

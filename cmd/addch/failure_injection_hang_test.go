@@ -37,16 +37,17 @@ func runHangTest(t *testing.T, sig syscall.Signal, wantCode int) {
 
 	t.Setenv("FAKE_FFMPEG", "hang")
 	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 
 	cmd := exec.Command(exePath(t), chaptersFile, video)
-	env := []string{"ADDCH_TEST_BINARY=1", "PATH=" + shim}
+	env := []string{"ADDCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
 		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "ADDCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)
 	}
+	env = append(env, "PATH="+shim+string(os.PathListSeparator)+os.Getenv("PATH"))
 	cmd.Env = env
 	var errBuf bytes.Buffer
 	cmd.Stderr = &errBuf

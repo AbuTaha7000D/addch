@@ -95,9 +95,9 @@ func TestRmchTempCleanupFailedStrip(t *testing.T) {
 
 	before := countTempMetadata()
 	t.Setenv("FAKE_FFMPEG", "fail")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 	var out, errBuf bytes.Buffer
-	code := runRmchWithPath(t, []string{input}, shim, &out, &errBuf)
+	code := runRmchFakeTool(t, []string{input}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}

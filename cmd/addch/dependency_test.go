@@ -23,7 +23,7 @@ func makePathShim(t *testing.T, tools ...string) string {
 		if err != nil {
 			t.Fatalf("could not locate %s for PATH shim: %v", tool, err)
 		}
-		if err := os.Symlink(real, filepath.Join(dir, tool)); err != nil {
+		if err := os.Symlink(real, filepath.Join(dir, tool+exeExt)); err != nil {
 			t.Fatalf("could not symlink %s into PATH shim: %v", tool, err)
 		}
 	}
@@ -31,6 +31,21 @@ func makePathShim(t *testing.T, tools ...string) string {
 }
 
 func runAddchWithPath(t *testing.T, args []string, path string, stdout, stderr io.Writer) int {
+	t.Helper()
+	return runAddchChild(t, args, path, false, stdout, stderr)
+}
+
+// runAddchFakeTool runs the real addch binary with the fake-tool aliases in
+// shim resolving first, while every other tool (in particular the real ffmpeg
+// and ffprobe) still resolves from the normal environment PATH — the same
+// resolution path the CLI uses in production. Fake alias names never collide
+// with real tools in a fakeToolShim, so appending the real PATH is lossless.
+func runAddchFakeTool(t *testing.T, args []string, path string, stdout, stderr io.Writer) int {
+	t.Helper()
+	return runAddchChild(t, args, path, true, stdout, stderr)
+}
+
+func runAddchChild(t *testing.T, args []string, path string, realPath bool, stdout, stderr io.Writer) int {
 	t.Helper()
 	cmd := exec.Command(exePath(t), args...)
 	env := []string{"ADDCH_TEST_BINARY=1"}
@@ -40,7 +55,11 @@ func runAddchWithPath(t *testing.T, args []string, path string, stdout, stderr i
 		}
 		env = append(env, kv)
 	}
-	env = append(env, "PATH="+path)
+	if realPath {
+		env = append(env, "PATH="+path+string(os.PathListSeparator)+os.Getenv("PATH"))
+	} else {
+		env = append(env, "PATH="+path)
+	}
 	cmd.Env = env
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr

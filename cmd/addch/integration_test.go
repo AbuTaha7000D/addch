@@ -207,6 +207,7 @@ func TestEndToEndBackslashInTitle(t *testing.T) {
 
 func TestEndToEndTitleEndingInBackslashFails(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	video := makeTestVideo(t, dir, "15")

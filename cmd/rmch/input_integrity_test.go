@@ -124,9 +124,9 @@ func TestRmchInputIntegrityFailedStrip(t *testing.T) {
 	inputs := snapshotFiles(t, input)
 
 	t.Setenv("FAKE_FFMPEG", "fail")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 	var out, errBuf bytes.Buffer
-	code := runRmchWithPath(t, []string{input}, shim, &out, &errBuf)
+	code := runRmchFakeTool(t, []string{input}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected nonzero exit with a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}

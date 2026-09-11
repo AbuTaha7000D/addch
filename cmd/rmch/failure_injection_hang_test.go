@@ -31,16 +31,17 @@ func runRmchHangTest(t *testing.T, sig syscall.Signal, wantCode int) {
 	video := makeChapteredFixture(t, dir, "chaptered.mp4", "mp4", "10")
 
 	t.Setenv("FAKE_FFMPEG", "hang")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 
 	cmd := exec.Command(exePath(t), video)
-	env := []string{"RMCH_TEST_BINARY=1", "PATH=" + shim}
+	env := []string{"RMCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
 		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "RMCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)
 	}
+	env = append(env, "PATH="+shim+string(os.PathListSeparator)+os.Getenv("PATH"))
 	cmd.Env = env
 	var errBuf bytes.Buffer
 	cmd.Stderr = &errBuf

@@ -18,8 +18,9 @@ import (
 // exposes only the requested tools, proving the dependency gate is ffprobe-only.
 
 // makePathShim creates a directory exposing only the given tools (as symlinks
-// to the real binaries) and returns it. It is used to run the CLI under a PATH
-// that hides ffmpeg from it while still providing ffprobe.
+// to the real binaries, suffixed with the platform executable extension) and
+// returns it. It is used to run the CLI under a PATH that hides ffmpeg from it
+// while still providing ffprobe.
 func makePathShim(t *testing.T, tools ...string) string {
 	t.Helper()
 	dir := t.TempDir()
@@ -28,7 +29,7 @@ func makePathShim(t *testing.T, tools ...string) string {
 		if err != nil {
 			t.Fatalf("could not locate %s for PATH shim: %v", tool, err)
 		}
-		if err := os.Symlink(real, filepath.Join(dir, tool)); err != nil {
+		if err := os.Symlink(real, filepath.Join(dir, tool+exeExt)); err != nil {
 			t.Fatalf("could not symlink %s into PATH shim: %v", tool, err)
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -115,9 +114,11 @@ func fakeFFprobe(role string) {
 }
 
 // fakeToolShim builds a PATH directory that exposes fakeTool as a symlink to
-// the test binary itself (which dispatches via maybeRunFakeTool) plus the
-// requested real tools, and returns the directory.
-func fakeToolShim(t *testing.T, fakeTool string, realTools ...string) string {
+// the test binary itself (which dispatches via maybeRunFakeTool) and returns
+// the directory. It deliberately contains no real tool aliases: real tools are
+// resolved from the normal environment PATH via runRmchFakeTool, so the fake
+// alias can never shadow or be shadowed by a real binary.
+func fakeToolShim(t *testing.T, fakeTool string) string {
 	t.Helper()
 	dir := t.TempDir()
 	exe, err := os.Executable()
@@ -125,13 +126,6 @@ func fakeToolShim(t *testing.T, fakeTool string, realTools ...string) string {
 		t.Fatalf("locate test binary for fake %s: %v", fakeTool, err)
 	}
 	rmchSymlinkForTest(t, exe, filepath.Join(dir, fakeTool+exeExt))
-	for _, tool := range realTools {
-		real, err := exec.LookPath(tool)
-		if err != nil {
-			t.Fatalf("could not locate real %s for PATH shim: %v", tool, err)
-		}
-		rmchSymlinkForTest(t, real, filepath.Join(dir, tool+exeExt))
-	}
 	return dir
 }
 
@@ -158,9 +152,9 @@ func TestRmchFakeFFprobeRejections(t *testing.T) {
 			}
 
 			t.Setenv("FAKE_FFPROBE", c.role)
-			shim := fakeToolShim(t, "ffprobe", "ffmpeg")
+			shim := fakeToolShim(t, "ffprobe")
 			var out, errBuf bytes.Buffer
-			code := runRmchWithPath(t, []string{video}, shim, &out, &errBuf)
+			code := runRmchFakeTool(t, []string{video}, shim, &out, &errBuf)
 			if code == 0 {
 				t.Fatalf("expected nonzero exit with a broken fake ffprobe\nstdout:\n%s", out.String())
 			}
@@ -183,10 +177,10 @@ func TestRmchFakeFFmpegStripFailure(t *testing.T) {
 	video := makeChapteredFixture(t, dir, "chaptered.mp4", "mp4", "10")
 
 	t.Setenv("FAKE_FFMPEG", "fail")
-	shim := fakeToolShim(t, "ffmpeg", "ffprobe")
+	shim := fakeToolShim(t, "ffmpeg")
 
 	var out, errBuf bytes.Buffer
-	code := runRmchWithPath(t, []string{video}, shim, &out, &errBuf)
+	code := runRmchFakeTool(t, []string{video}, shim, &out, &errBuf)
 	if code == 0 {
 		t.Fatalf("expected nonzero exit with a failing fake ffmpeg\nstdout:\n%s", out.String())
 	}
@@ -244,6 +238,7 @@ func TestRmchInvalidPayloads(t *testing.T) {
 // healthy chaptered sibling is stripped, and the summary counts both.
 func TestRmchBatchCorruptSiblingContinues(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	good := makeChapteredFixture(t, dir, "good.mp4", "mp4", "10")

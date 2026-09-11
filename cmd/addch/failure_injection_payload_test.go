@@ -138,6 +138,7 @@ func mustBatchDurationMs(t *testing.T, mediaPath string) int64 {
 // and leaves nothing littered — FFmpeg itself rejects the unopenable path.
 func TestAddchOutputDirNonexistentFails(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	video := makeTestVideo(t, dir, "5")

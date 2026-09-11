@@ -247,6 +247,7 @@ func TestRemoveMKV(t *testing.T) {
 // unchanged codecs, and no temp metadata leak.
 func removeContainer(t *testing.T, container string) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	input := makeChapteredFixture(t, dir, "chaptered."+container, container, "10")
@@ -367,6 +368,7 @@ func TestOverwriteFlag(t *testing.T) {
 
 func TestRemoveFailureCleansUp(t *testing.T) {
 	requireTools(t)
+	t.Setenv("ADDCH_METADATA_TMPDIR", t.TempDir())
 
 	dir := t.TempDir()
 	input := makeChapteredFixture(t, dir, "chaptered.mp4", "mp4", "10")
