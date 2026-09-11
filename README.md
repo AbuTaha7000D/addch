@@ -17,6 +17,28 @@ remain independent executables.
 
 ---
 
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Requirements](#requirements)
+- [Installation](#installation)
+  - [Prebuilt binaries](#prebuilt-binaries)
+  - [Build from source](#build-from-source)
+- [Usage](#usage)
+  - [addch — add chapters](#addch--add-chapters)
+  - [rmch — remove chapters](#rmch--remove-chapters)
+  - [getch — extract chapters](#getch--extract-chapters)
+  - [Batch mode](#batch-mode)
+- [Options reference](#options-reference)
+- [Chapter file format](#chapter-file-format)
+- [Validation](#validation)
+- [How it works](#how-it-works)
+  - [Supported containers](#supported-containers)
+- [Development](#development)
+- [License](#license)
+
+---
+
 ## Quick Start
 
 **Step 1 — Install FFmpeg**
@@ -220,11 +242,11 @@ step-by-step.
 | Platform | Archive (ZIP) |
 | ------------------- | --------------------------------------------- |
 | Linux x86_64 (amd64) | `addch-linux-amd64.zip` |
-| Linux ARM64          | `addch-linux-arm64.zip` |
-| macOS Intel (amd64)  | `addch-darwin-amd64.zip` |
-| macOS Apple Silicon  | `addch-darwin-arm64.zip` |
+| Linux ARM64 | `addch-linux-arm64.zip` |
+| macOS Intel (amd64) | `addch-darwin-amd64.zip` |
+| macOS Apple Silicon | `addch-darwin-arm64.zip` |
 | Windows x86_64 (amd64) | `addch-windows-amd64.zip` |
-| Windows ARM64        | `addch-windows-arm64.zip` |
+| Windows ARM64 | `addch-windows-arm64.zip` |
 
 Each ZIP contains all three tools (`addch`, `rmch`, and `getch`; with an `.exe`
 extension on Windows) together with `LICENSE` and `README.md`. The binaries are
@@ -340,7 +362,7 @@ Total: N | Succeeded: N | Skipped: N | Failed: N
 | `--overwrite` | Replace the output file if it already exists | ✓ | ✓ | ✓ |
 | `--dir` | Batch mode: files directly inside a directory | ✓ | ✓ | ✓ |
 | `--recursive` | Batch mode: directory and all subdirectories | ✓ | ✓ | ✓ |
-| `--example` | Write `example_chapters.txt` and exit | ✓ | — | — |
+| `--example` | Write `example_chapters.txt` and exit | ✓ | - | - |
 | `--check` | Verify FFmpeg/FFprobe availability (`addch`/`rmch` need both; `getch` needs `ffprobe` only) | ✓ | ✓ | ✓ |
 | `--version` | Print the version and exit | ✓ | ✓ | ✓ |
 | `-h, --help` | Print this help and exit | ✓ | ✓ | ✓ |
@@ -481,4 +503,4 @@ details on its license.
 ## Author
 
 The toolkit is maintained by [Mahmoud Ehab](https://github.com/AbuTaha7000D)
-(eng.mahmoud.e.hussein@gmail.com).
+(<eng.mahmoud.e.hussein@gmail.com>).
