@@ -41,6 +41,6 @@ jobs:
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:
-          args: release --clean
+          args: release --clean ${{ contains(github.ref_name, '-') && '--draft' || '' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

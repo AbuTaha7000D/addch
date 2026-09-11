@@ -2,6 +2,48 @@
 
 All notable changes to the addch chapter toolkit are documented in this file.
 
+## [v1.2.9-rc] - 2026-09-11
+
+Release candidate for the v1.2.9 line. The feature set is unchanged from
+v0.2.0; this candidate aligns the internal version number with the next
+release and hardens the test/CI surface so the six-platform matrix is
+shippable from Windows runners, where Chocolatey had broken the getch
+dependency tests. Final release supersedes this candidate.
+
+#### Added
+
+- Inline `getch` diagnostic that reproduces the ffprobe `-version`
+  subprocess — command path, launch/exit error, and captured stdout/stderr —
+  when an ffprobe-only dependency test fails, so Windows-only subprocess
+  failures surface the real cause in CI (`9998caf`).
+
+#### Fixed
+
+- Internal version default bumped from `dev` to `1.2.9` across all three
+  CLIs, with matching unit contract assertions (`8d18ce5`).
+- FFprobe duration errors render the video path unquoted (`%s` instead of
+  `%q`) so released-binary diagnostics are byte-stable and Windows
+  backslash paths match cross-platform test assertions (`9998caf`).
+- Child test environments drop both `PATH=` and the case-insensitive `Path=`
+  variables when isolating a shim-only PATH, so the host system path cannot
+  leak into re-executed children on Windows (`9998caf`).
+- Windows runners expose ffmpeg/ffprobe as a Chocolatey shimgen launcher in
+  `<root>\bin` that resolves its real target via a self-relative path;
+  symlinking it into an isolated temp PATH broke that resolution ("Cannot
+  find file at '..\lib\ffmpeg\tools\ffmpeg\bin\ffprobe.exe'"). The test PATH
+  now resolves the real binary under `<root>\lib` and stages a
+  self-contained copy plus its adjacent DLLs, keeping ffmpeg excluded
+  (`ed60937`).
+- Windows fake-tool and hostile-path fixtures: the exe suffix is symlinked
+  in `makePathShim`, fake tools resolve from a composed shim+real PATH,
+  trailing-space path components Windows cannot address mid-path were
+  dropped, and remaining Windows-running temp-count tests are isolated
+  behind `ADDCH_METADATA_TMPDIR` (`c8ebad1`).
+- macOS and Windows CI failures: timebase-to-millis rounding, verbatim
+  probe/traversal path names, uniform chapters-file-directory rejection,
+  `.exe`-suffixed clitest tool builds, and platform-hermetic
+  temp-count/0644/hostile-path tests (`ec787d0`).
+
 ## [v0.2.0] - 2026-09-10
 
 The v0.2.0 release ships the complete three-tool chapter toolkit: `addch`
