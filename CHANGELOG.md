@@ -2,13 +2,21 @@
 
 All notable changes to the addch chapter toolkit are documented in this file.
 
-## [v1.2.9-rc] - 2026-09-11
+## [v1.2.9] - 2026-09-11
 
-Release candidate for the v1.2.9 line. The feature set is unchanged from
-v0.2.0; this candidate aligns the internal version number with the next
-release and hardens the test/CI surface so the six-platform matrix is
-shippable from Windows runners, where Chocolatey had broken the getch
-dependency tests. Final release supersedes this candidate.
+The v1.2.9 release ships the three-tool chapter toolkit — `addch`, `rmch`,
+and `getch` — for the documented six-platform matrix, with the internal
+version aligned to `1.2.9`. It was released as `v1.2.9-rc` (see below) and
+finalized without further code changes.
+
+### v1.2.9-rc
+
+Release candidate for the v1.2.9 line, shipping the `addch`, `rmch`, and
+`getch` binaries for the documented six-platform matrix. The feature set
+is unchanged from v0.2.0; this candidate aligns the internal version
+number with the next release and hardens the test/CI surface so the
+release is shippable from Windows runners, where Chocolatey had broken
+the getch dependency tests. Superseded by the final entry below.
 
 #### Added
 
@@ -43,6 +51,15 @@ dependency tests. Final release supersedes this candidate.
   probe/traversal path names, uniform chapters-file-directory rejection,
   `.exe`-suffixed clitest tool builds, and platform-hermetic
   temp-count/0644/hostile-path tests (`ec787d0`).
+
+### v1.2.9 (final)
+
+- The full feature set of the `v1.2.9-rc` entry above (release candidate),
+  unchanged.
+- The candidate is finalized as the `v1.2.9` release with no further code
+  changes; project version output and release/build metadata identify
+  `1.2.9`, and the version references in this file now reflect the final
+  release.
 
 ## [v0.2.0] - 2026-09-10
 
