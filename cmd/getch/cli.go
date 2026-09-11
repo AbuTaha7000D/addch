@@ -10,7 +10,7 @@ import (
 // version is set at build time via -ldflags "-X main.version=...". getch is a
 // separate package from cmd/addch and cmd/rmch, so its main.version symbol does
 // not clash.
-var version = "dev"
+var version = "1.2.9"
 
 // usageText documents the getch CLI. The stdout/stderr split is part of getch's
 // contract: chapter data is the only thing ever written to stdout, so it can be

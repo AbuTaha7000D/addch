@@ -9,7 +9,7 @@ import (
 )
 
 // version is set at build time via -ldflags "-X main.version=...".
-var version = "dev"
+var version = "1.2.9"
 
 //go:embed example_chapters.txt
 var exampleContent string

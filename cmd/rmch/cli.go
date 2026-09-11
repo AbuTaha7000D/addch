@@ -9,7 +9,7 @@ import (
 
 // version is set at build time via -ldflags "-X main.version=...". rmch is a
 // separate package from cmd/addch, so its main.version symbol does not clash.
-var version = "dev"
+var version = "1.2.9"
 
 const usageText = `rmch — remove chapters from a video/audio file without re-encoding.
 

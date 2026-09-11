@@ -61,7 +61,7 @@ func TestContractVersion(t *testing.T) {
 	if code := run([]string{"--version"}, &out, &errBuf); code != 0 {
 		t.Errorf("exit code = %d, want 0", code)
 	}
-	if want := "rmch dev\n"; out.String() != want {
+	if want := "rmch 1.2.9\n"; out.String() != want {
 		t.Errorf("version output = %q, want %q", out.String(), want)
 	}
 	if errBuf.Len() != 0 {
