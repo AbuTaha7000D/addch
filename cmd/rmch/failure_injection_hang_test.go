@@ -36,7 +36,7 @@ func runRmchHangTest(t *testing.T, sig syscall.Signal, wantCode int) {
 	cmd := exec.Command(exePath(t), video)
 	env := []string{"RMCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "RMCH_TEST_BINARY=") {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") || strings.HasPrefix(kv, "RMCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)

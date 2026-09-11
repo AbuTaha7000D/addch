@@ -50,7 +50,7 @@ func runAddchChild(t *testing.T, args []string, path string, realPath bool, stdo
 	cmd := exec.Command(exePath(t), args...)
 	env := []string{"ADDCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "ADDCH_TEST_BINARY=") {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") || strings.HasPrefix(kv, "ADDCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)

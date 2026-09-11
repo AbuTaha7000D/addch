@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -43,7 +44,7 @@ func runWithPath(t *testing.T, args []string, path string, stdout, stderr io.Wri
 	cmd := exec.Command(exePath(t), args...)
 	env := []string{"GETCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "GETCH_TEST_BINARY=") {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") || strings.HasPrefix(kv, "GETCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)
@@ -62,6 +63,54 @@ func runWithPath(t *testing.T, args []string, path string, stdout, stderr io.Wri
 	}
 }
 
+// diagnoseFFprobeVersion reproduces the ffprobe -version subprocess the getch
+// child runs inside CheckDependencies, using the same PATH-isolated environment
+// that runWithPath builds for the child. The child swallows the real subprocess
+// error into its exit code and never prints it, so when an ffprobe-only test
+// fails this reproduces the step to surface the actual launch/exit error, the
+// resolved probe path, and the captured stdout/stderr. It is called only from
+// the ffprobe-only tests' failure branches and never alters the child's PATH.
+func diagnoseFFprobeVersion(t *testing.T, shimDir string, childOut, childErr *bytes.Buffer) {
+	t.Helper()
+	t.Logf("child exited nonzero; reproducing the ffprobe -version subprocess from the child's PATH")
+	t.Logf("child stdout:\n%s", childOut.String())
+	t.Logf("child stderr:\n%s", childErr.String())
+
+	// Mirror runWithPath's PATH isolation so the reproduction resolves ffprobe
+	// through the same symlink and with the same effective PATH the child had.
+	env := []string{"GETCH_TEST_BINARY=1"}
+	for _, kv := range os.Environ() {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") || strings.HasPrefix(kv, "GETCH_TEST_BINARY=") {
+			continue
+		}
+		env = append(env, kv)
+	}
+	env = append(env, "PATH="+shimDir)
+
+	probe := filepath.Join(shimDir, "ffprobe"+exeExt)
+	t.Logf("effective PATH for ffprobe: %s", shimDir)
+	t.Logf("resolved ffprobe path the child executes: %s", probe)
+
+	cmd := exec.Command(probe, "-version")
+	cmd.Env = env
+	var out, stderr bytes.Buffer
+	cmd.Stdout = &out
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	if err != nil {
+		var exitErr *exec.ExitError
+		if errors.As(err, &exitErr) {
+			t.Logf("ffprobe -version subprocess exit error: %v (exit code %d)", exitErr, exitErr.ExitCode())
+		} else {
+			t.Logf("ffprobe -version subprocess failed to start: %v", err)
+		}
+	} else {
+		t.Logf("ffprobe -version subprocess ran successfully")
+	}
+	t.Logf("ffprobe -version stdout:\n%s", out.String())
+	t.Logf("ffprobe -version stderr:\n%s", stderr.String())
+}
+
 // TestGetchCheckFFprobeOnlySucceeds proves getch --check passes when only
 // ffprobe is present: an ffmpeg-less PATH must not block getch.
 func TestGetchCheckFFprobeOnlySucceeds(t *testing.T) {
@@ -71,6 +120,7 @@ func TestGetchCheckFFprobeOnlySucceeds(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	code := runWithPath(t, []string{"--check"}, shim, &out, &errBuf)
 	if code != 0 {
+		diagnoseFFprobeVersion(t, shim, &out, &errBuf)
 		t.Fatalf("getch --check with ffprobe-only PATH: exit %d, want 0\nstdout:\n%s\nstderr:\n%s", code, out.String(), errBuf.String())
 	}
 	if !strings.Contains(out.String(), "System is ready.") {
@@ -93,6 +143,7 @@ func TestGetchExtractFFprobeOnlySucceeds(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	code := runWithPath(t, []string{video}, shim, &out, &errBuf)
 	if code != 0 {
+		diagnoseFFprobeVersion(t, shim, &out, &errBuf)
 		t.Fatalf("getch extract with ffprobe-only PATH: exit %d, want 0\nstderr:\n%s", code, errBuf.String())
 	}
 	if got := out.String(); got == "" {
@@ -125,6 +176,7 @@ func TestGetchBatchFFprobeOnlySucceeds(t *testing.T) {
 	var out, errBuf bytes.Buffer
 	code := runWithPath(t, []string{"--dir", batchDir}, shim, &out, &errBuf)
 	if code != 0 {
+		diagnoseFFprobeVersion(t, shim, &out, &errBuf)
 		t.Fatalf("getch batch with ffprobe-only PATH: exit %d, want 0\nstderr:\n%s", code, errBuf.String())
 	}
 	sidecar := filepath.Join(batchDir, "clip.txt")

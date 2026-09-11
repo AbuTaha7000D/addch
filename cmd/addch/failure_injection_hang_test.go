@@ -42,7 +42,7 @@ func runHangTest(t *testing.T, sig syscall.Signal, wantCode int) {
 	cmd := exec.Command(exePath(t), chaptersFile, video)
 	env := []string{"ADDCH_TEST_BINARY=1"}
 	for _, kv := range os.Environ() {
-		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "ADDCH_TEST_BINARY=") {
+		if strings.HasPrefix(kv, "PATH=") || strings.HasPrefix(kv, "Path=") || strings.HasPrefix(kv, "ADDCH_TEST_BINARY=") {
 			continue
 		}
 		env = append(env, kv)

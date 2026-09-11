@@ -44,17 +44,17 @@ func GetVideoDurationMs(videoPath string) (int64, error) {
 	}
 	var pf probeFormat
 	if err := json.Unmarshal(out, &pf); err != nil {
-		return 0, fmt.Errorf("could not parse ffprobe output for %q: %v", videoPath, err)
+		return 0, fmt.Errorf("could not parse ffprobe output for %s: %v", videoPath, err)
 	}
 	if pf.Format.Duration == "" || pf.Format.Duration == "N/A" {
-		return 0, fmt.Errorf("could not determine the duration of %q — is it a valid video file?", videoPath)
+		return 0, fmt.Errorf("could not determine the duration of %s — is it a valid video file?", videoPath)
 	}
 	ms, err := ParseDurationToMs(pf.Format.Duration)
 	if err != nil {
-		return 0, fmt.Errorf("could not parse duration %q for %q: %v", pf.Format.Duration, videoPath, err)
+		return 0, fmt.Errorf("could not parse duration %q for %s: %v", pf.Format.Duration, videoPath, err)
 	}
 	if ms <= 0 {
-		return 0, fmt.Errorf("could not determine the duration of %q — is it a valid video file?", videoPath)
+		return 0, fmt.Errorf("could not determine the duration of %s — is it a valid video file?", videoPath)
 	}
 	return ms, nil
 }
