@@ -27,21 +27,31 @@ provides both. See [Requirements](#requirements) for your operating system.
 
 **Step 2 — Download and extract the right archive**
 
-Each release publishes `addch`, `rmch`, and `getch` for every platform, packed
-as archives: `tar.gz` on Linux and macOS, `zip` on Windows. Go to the
+Each release publishes one ZIP archive for every platform. That single archive
+contains all three tools — `addch`, `rmch`, and `getch` — plus `LICENSE` and
+`README.md`, so one download gives you the whole toolkit. Go to the
 [Releases page](https://github.com/AbuTaha7000D/addch/releases), open the latest
 release, and download the archive that matches your operating system and
-architecture (CPU type). Extract it and you get the binary named in the table
-below (plus `LICENSE` and `README.md` inside the archive).
+architecture (CPU type):
 
-| Your operating system | `addch` | `rmch` | `getch` |
-| --------------------- | ------- | ------ | ------- |
-| **Linux** — Intel/AMD 64-bit PC or server (most common) | `addch-linux-amd64` | `rmch-linux-amd64` | `getch-linux-amd64` |
-| **Linux** — 64-bit ARM (e.g. many Raspberry Pi models) | `addch-linux-arm64` | `rmch-linux-arm64` | `getch-linux-arm64` |
-| **macOS** — Intel processor | `addch-darwin-amd64` | `rmch-darwin-amd64` | `getch-darwin-amd64` |
-| **macOS** — Apple Silicon (M1, M2, M3, M4) | `addch-darwin-arm64` | `rmch-darwin-arm64` | `getch-darwin-arm64` |
-| **Windows** — Intel/AMD 64-bit PC | `addch-windows-amd64.exe` | `rmch-windows-amd64.exe` | `getch-windows-amd64.exe` |
-| **Windows** — 64-bit ARM | `addch-windows-arm64.exe` | `rmch-windows-arm64.exe` | `getch-windows-arm64.exe` |
+| Your operating system | Archive |
+| --------------------- | ------- |
+| **Linux** — Intel/AMD 64-bit PC or server (most common) | `addch-linux-amd64.zip` |
+| **Linux** — 64-bit ARM (e.g. many Raspberry Pi models) | `addch-linux-arm64.zip` |
+| **macOS** — Intel processor | `addch-darwin-amd64.zip` |
+| **macOS** — Apple Silicon (M1, M2, M3, M4) | `addch-darwin-arm64.zip` |
+| **Windows** — Intel/AMD 64-bit PC | `addch-windows-amd64.zip` |
+| **Windows** — 64-bit ARM | `addch-windows-arm64.zip` |
+
+For example, `addch-linux-amd64.zip` contains three binaries (Windows appends
+`.exe` to each name):
+
+```
+addch-linux-amd64.zip
+├── addch
+├── rmch
+└── getch
+```
 
 Don't worry if you aren't sure what `amd64` or `arm64` means:
 
@@ -54,29 +64,25 @@ If in doubt on a normal PC, choose the **`amd64`** archive for your operating sy
 
 **Step 3 — Install and run the binary**
 
-On **Linux / macOS**, the downloaded archives contain the binaries. Extract
-them first:
+On **Linux / macOS**, unzip the downloaded archive first. `unzip` is usually
+already installed (on Ubuntu/Debian run `sudo apt install unzip` if not):
 
 ```sh
-# Extract the downloaded archives (each also contains LICENSE and README.md)
-tar -xzf addch-linux-amd64.tar.gz
-tar -xzf rmch-linux-amd64.tar.gz
-tar -xzf getch-linux-amd64.tar.gz
+# Extract the archive (it contains addch, rmch, getch, LICENSE, README.md)
+unzip addch-linux-amd64.zip
 ```
 
-The extracted binary does not yet have execute permission, so your system won't
-let you run it yet. Make it executable, then (optionally) move it into a
+The extracted binaries do not yet have execute permission, so your system won't
+let you run them yet. Make them executable, then (optionally) move them into a
 directory on your `PATH` so you can run `addch` from anywhere. Open a terminal
 and run:
 
 ```sh
-# Make the binary executable
-chmod +x addch-linux-amd64 rmch-linux-amd64 getch-linux-amd64
+# Make the binaries executable
+chmod +x addch rmch getch
 
 # (Optional) Move them to a directory on your PATH, e.g. /usr/local/bin
-sudo mv addch-linux-amd64 /usr/local/bin/addch
-sudo mv rmch-linux-amd64 /usr/local/bin/rmch
-sudo mv getch-linux-amd64 /usr/local/bin/getch
+sudo mv addch rmch getch /usr/local/bin/
 
 # Verify they are installed
 addch --version
@@ -96,7 +102,7 @@ or Command Prompt), for example:
 ```powershell
 # Navigate to the folder where you extracted the .exe files
 cd C:\Users\YourName\Downloads
-.\addch-windows-amd64.exe --version
+.\addch.exe --version
 ```
 
 For convenient use from any folder, add that download folder to your Windows
@@ -206,21 +212,23 @@ Install FFmpeg/FFprobe:
 
 Download the release archive for your platform from the
 [Releases page](https://github.com/AbuTaha7000D/addch/releases). You do **not**
-need to install Go to use the prebuilt binaries — just download the archive
-matching your system, extract it, make the extracted binary executable
-(macOS/Linux), and run it. See the [Quick Start](#quick-start) for the full
+need to install Go to use the prebuilt binaries — just download the single ZIP
+archive matching your system, extract it, make the extracted binaries executable
+(macOS/Linux), and run them. See the [Quick Start](#quick-start) for the full
 step-by-step.
 
-| Platform | Binaries |
+| Platform | Archive (ZIP) |
 | ------------------- | --------------------------------------------- |
-| Linux x86_64 (amd64) | `addch-linux-amd64`, `rmch-linux-amd64`, `getch-linux-amd64` |
-| Linux ARM64          | `addch-linux-arm64`, `rmch-linux-arm64`, `getch-linux-arm64` |
-| macOS Intel (amd64)  | `addch-darwin-amd64`, `rmch-darwin-amd64`, `getch-darwin-amd64` |
-| macOS Apple Silicon  | `addch-darwin-arm64`, `rmch-darwin-arm64`, `getch-darwin-arm64` |
-| Windows x86_64 (amd64) | `addch-windows-amd64.exe`, `rmch-windows-amd64.exe`, `getch-windows-amd64.exe` |
-| Windows ARM64        | `addch-windows-arm64.exe`, `rmch-windows-arm64.exe`, `getch-windows-arm64.exe` |
+| Linux x86_64 (amd64) | `addch-linux-amd64.zip` |
+| Linux ARM64          | `addch-linux-arm64.zip` |
+| macOS Intel (amd64)  | `addch-darwin-amd64.zip` |
+| macOS Apple Silicon  | `addch-darwin-arm64.zip` |
+| Windows x86_64 (amd64) | `addch-windows-amd64.zip` |
+| Windows ARM64        | `addch-windows-arm64.zip` |
 
-The binaries are self-contained; you still need the external programs listed in
+Each ZIP contains all three tools (`addch`, `rmch`, and `getch`; with an `.exe`
+extension on Windows) together with `LICENSE` and `README.md`. The binaries are
+self-contained; you still need the external programs listed in
 [Requirements](#requirements).
 
 Each release also includes a `SHA256SUMS.txt` file so you can verify the checksum

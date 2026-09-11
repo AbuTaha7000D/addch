@@ -14,7 +14,8 @@
 #   binaries-dir     Directory containing the executable addch, rmch, getch
 #                    binaries. Default: dist/bin under the repo root; if that
 #                    is missing, a fresh goreleaser snapshot is built and the
-#                    linux/amd64 archives are extracted into it.
+#                    linux/amd64 ZIP (addch-linux-amd64.zip) is extracted into
+#                    it.
 #   corpus-dir       Read-only media corpus to copy per run. Default:
 #                    manualTestsFolder next to the repo root.
 #   expected-version Exact version every `--version` must print (e.g.
@@ -26,7 +27,7 @@
 # and after the run, so the originals are provably untouched. The script exits
 # 0 only when every check passes; any mismatch prints a FAIL line and exits 1.
 #
-# Prerequisites on PATH: ffmpeg, ffprobe, python3, tar, sha256sum, bash 4+.
+# Prerequisites on PATH: ffmpeg, ffprobe, python3, unzip, sha256sum, bash 4+.
 # When the default binaries layout is missing, also: go and network access (to
 # fetch the goreleaser toolchain via `go run`, which leaves go.mod untouched).
 
@@ -55,7 +56,7 @@ note() { printf '%s\n' "$*"; }
 # ---------------------------------------------------------------------------
 # Required tools
 # ---------------------------------------------------------------------------
-for cmd in ffmpeg ffprobe python3 tar sha256sum; do
+for cmd in ffmpeg ffprobe python3 unzip sha256sum; do
   command -v "$cmd" >/dev/null 2>&1 || fail "required tool '$cmd' not found in PATH"
 done
 
@@ -122,9 +123,9 @@ else
     (cd "$DIST" && sha256sum -c SHA256SUMS.txt >/dev/null 2>&1) \
       || fail "dist SHA256SUMS.txt failed its own checksum verification"
     mkdir -p "$BIN"
+    unzip -q "$DIST/addch-linux-amd64.zip" -d "$BIN" || fail "extract addch-linux-amd64.zip"
     for t in addch rmch getch; do
-      tar -xzf "$DIST/$t-linux-amd64.tar.gz" -C "$BIN" || fail "extract $t archive"
-      mv "$BIN/$t-linux-amd64" "$BIN/$t" || fail "rename $t into $BIN"
+      [ -x "$BIN/$t" ] || fail "addch-linux-amd64.zip is missing executable $t"
     done
   fi
 fi
